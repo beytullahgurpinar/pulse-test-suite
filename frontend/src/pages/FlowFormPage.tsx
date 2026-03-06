@@ -1,0 +1,308 @@
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import {
+    Box,
+    Typography,
+    Button,
+    FormControl,
+    FormLabel,
+    Input,
+    IconButton,
+    Card,
+    CardContent,
+    CircularProgress,
+    Sheet,
+    Select,
+    Option,
+    Divider,
+} from '@mui/joy';
+import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import AddRoundedIcon from '@mui/icons-material/AddRounded';
+import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
+import { api } from '../api';
+import type { Flow, FlowStep, TestRequest } from '../types';
+import { PageHeader } from '../components/PageHeader';
+
+export function FlowFormPage() {
+    const { projectId, id } = useParams();
+    const navigate = useNavigate();
+    const pid = projectId ? parseInt(projectId, 10) : null;
+    const flowId = id ? parseInt(id, 10) : null;
+
+    const [loading, setLoading] = useState(!!flowId);
+    const [saving, setSaving] = useState(false);
+    const [name, setName] = useState('');
+    const [steps, setSteps] = useState<(FlowStep & { uid: string })[]>([]);
+    const [projectTests, setProjectTests] = useState<TestRequest[]>([]);
+    const [error, setError] = useState('');
+
+    useEffect(() => {
+        if (!pid) return;
+        api.listTests(pid).then(setProjectTests).catch(console.error);
+
+        if (flowId) {
+            api.getFlow(flowId).then((f) => {
+                setName(f.name);
+                setSteps(f.steps.map(s => ({ ...s, uid: Math.random().toString(36).substr(2, 9) })));
+            }).catch((e) => setError(e.message))
+                .finally(() => setLoading(false));
+        }
+    }, [pid, flowId]);
+
+    const addStep = () => {
+        setSteps([
+            ...steps,
+            { uid: Math.random().toString(36).substr(2, 9), testRequestId: 0, orderNum: steps.length, extractions: {} }
+        ]);
+    };
+
+    const removeStep = (index: number) => {
+        const updated = steps.filter((_, i) => i !== index);
+        setSteps(updated.map((s, i) => ({ ...s, orderNum: i })));
+    };
+
+    const updateStep = (index: number, field: keyof FlowStep, value: any) => {
+        const updated = [...steps];
+        updated[index] = { ...updated[index], [field]: value };
+        setSteps(updated);
+    };
+
+    const addExtraction = (stepIndex: number) => {
+        const s = { ...steps[stepIndex] };
+        s.extractions = { ...s.extractions, '': '' };
+        updateStep(stepIndex, 'extractions', s.extractions);
+    };
+
+    const updateExtraction = (stepIndex: number, oldKey: string, newKey: string, newValue: string) => {
+        const s = { ...steps[stepIndex] };
+        const exts = { ...s.extractions };
+        if (oldKey !== newKey) {
+            delete exts[oldKey];
+        }
+        exts[newKey] = newValue;
+        updateStep(stepIndex, 'extractions', exts);
+    };
+
+    const removeExtraction = (stepIndex: number, key: string) => {
+        const s = { ...steps[stepIndex] };
+        const exts = { ...s.extractions };
+        delete exts[key];
+        updateStep(stepIndex, 'extractions', exts);
+    };
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!pid || !name.trim()) return;
+
+        // Validate steps
+        if (steps.some(s => s.testRequestId === 0)) {
+            setError('Please select a test for all steps');
+            return;
+        }
+
+        setSaving(true);
+        setError('');
+
+        const payload: Partial<Flow> = {
+            projectId: pid,
+            name: name.trim(),
+            steps: steps.map((s, i) => ({
+                testRequestId: s.testRequestId,
+                orderNum: i,
+                extractions: s.extractions
+            }))
+        };
+
+        try {
+            if (flowId) {
+                await api.updateFlow(flowId, payload);
+            } else {
+                await api.createFlow(payload);
+            }
+            navigate(`/p/${pid}/flows`); // Redirect back to flows
+        } catch (err: any) {
+            setError(err.message || 'Failed to save flow');
+            setSaving(false);
+        }
+    };
+
+    if (loading) {
+        return (
+            <Box display="flex" justifyContent="center" py={8}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    return (
+        <Box sx={{ width: '100%', minWidth: 0 }}>
+            <PageHeader
+                title={flowId ? 'Edit Flow' : 'New Flow'}
+                icon={<AccountTreeRoundedIcon />}
+                actions={
+                    <Button
+                        variant="plain"
+                        color="neutral"
+                        startDecorator={<ArrowBackRoundedIcon />}
+                        onClick={() => navigate(`/p/${pid}/flows`)}
+                    >
+                        Back to Flows
+                    </Button>
+                }
+            />
+
+            <form onSubmit={handleSave}>
+                <Card variant="outlined" sx={{ mb: 3, borderRadius: '12px', boxShadow: 'sm' }}>
+                    <CardContent>
+                        {error && (
+                            <Sheet color="danger" variant="soft" sx={{ p: 2, borderRadius: 'md', mb: 2 }}>
+                                <Typography color="danger" fontWeight="sm">{error}</Typography>
+                            </Sheet>
+                        )}
+
+                        <FormControl sx={{ mb: 3 }} required>
+                            <FormLabel>Flow Name</FormLabel>
+                            <Input
+                                placeholder="e.g. User Registration Flow"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                            />
+                        </FormControl>
+
+                        <Typography level="title-md" fontWeight={600} mb={2}>
+                            Steps
+                        </Typography>
+
+                        {steps.length === 0 ? (
+                            <Sheet variant="soft" sx={{ p: 4, borderRadius: 'md', textAlign: 'center', mb: 3 }}>
+                                <Typography level="body-md" color="neutral" mb={2}>
+                                    No steps added yet. A flow executes multiple tests in sequence.
+                                </Typography>
+                                <Button variant="outlined" startDecorator={<AddRoundedIcon />} onClick={addStep}>
+                                    Add First Step
+                                </Button>
+                            </Sheet>
+                        ) : (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mb: 3 }}>
+                                {steps.map((step, idx) => (
+                                    <Sheet
+                                        key={step.uid}
+                                        variant="outlined"
+                                        sx={{
+                                            p: 2,
+                                            borderRadius: 'md',
+                                            borderLeft: '4px solid',
+                                            borderLeftColor: 'primary.400',
+                                            bgcolor: 'background.surface',
+                                        }}
+                                    >
+                                        <Box display="flex" alignItems="flex-start" gap={2}>
+                                            <Box sx={{ mt: 1, color: 'text.tertiary', cursor: 'grab' }}>
+                                                <DragIndicatorIcon />
+                                            </Box>
+                                            <Box sx={{ flex: 1 }}>
+                                                <Box display="flex" gap={2} mb={2}>
+                                                    <FormControl sx={{ flex: 1 }}>
+                                                        <FormLabel>Test to Execute</FormLabel>
+                                                        <Select
+                                                            placeholder="Select a test"
+                                                            value={step.testRequestId || null}
+                                                            onChange={(_, val) => updateStep(idx, 'testRequestId', val)}
+                                                        >
+                                                            {projectTests.map((t) => (
+                                                                <Option key={t.id} value={t.id}>{t.name}</Option>
+                                                            ))}
+                                                        </Select>
+                                                    </FormControl>
+                                                    <IconButton
+                                                        color="danger"
+                                                        variant="plain"
+                                                        onClick={() => removeStep(idx)}
+                                                        sx={{ mt: 3.5 }}
+                                                    >
+                                                        <DeleteRoundedIcon />
+                                                    </IconButton>
+                                                </Box>
+
+                                                <Divider sx={{ my: 1.5 }} />
+
+                                                <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                                    <Typography level="body-sm" fontWeight={600}>
+                                                        Data Extractions (Optional)
+                                                    </Typography>
+                                                    <Button size="sm" variant="plain" onClick={() => addExtraction(idx)}>
+                                                        + Add Extraction
+                                                    </Button>
+                                                </Box>
+
+                                                {Object.entries(step.extractions || {}).map(([key, value], eIdx) => (
+                                                    <Box key={eIdx} display="flex" gap={1} mb={1}>
+                                                        <Input
+                                                            size="sm"
+                                                            placeholder="Variable Name (e.g. TOKEN)"
+                                                            value={key}
+                                                            onChange={(e) => updateExtraction(idx, key, e.target.value, String(value))}
+                                                            sx={{ flex: 1 }}
+                                                        />
+                                                        <Input
+                                                            size="sm"
+                                                            placeholder="JSONPath (e.g. data.token)"
+                                                            value={String(value)}
+                                                            onChange={(e) => updateExtraction(idx, key, key, e.target.value)}
+                                                            sx={{ flex: 2 }}
+                                                        />
+                                                        <IconButton
+                                                            size="sm"
+                                                            color="danger"
+                                                            variant="plain"
+                                                            onClick={() => removeExtraction(idx, key)}
+                                                        >
+                                                            <DeleteRoundedIcon />
+                                                        </IconButton>
+                                                    </Box>
+                                                ))}
+                                                {Object.keys(step.extractions || {}).length === 0 && (
+                                                    <Typography level="body-xs" color="neutral">
+                                                        Extract values from response and save as variables to use in subsequent steps.
+                                                    </Typography>
+                                                )}
+                                            </Box>
+                                        </Box>
+                                    </Sheet>
+                                ))}
+                            </Box>
+                        )}
+
+                        {steps.length > 0 && (
+                            <Button variant="outlined" startDecorator={<AddRoundedIcon />} onClick={addStep} sx={{ mb: 2 }}>
+                                Add Step
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Box display="flex" justifyContent="flex-end">
+                    <Button
+                        type="submit"
+                        loading={saving}
+                        startDecorator={<SaveRoundedIcon />}
+                        sx={{
+                            px: 4,
+                            py: 1.5,
+                            fontSize: '1rem',
+                            background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                            '&:hover': {
+                                background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+                            }
+                        }}
+                    >
+                        Save Flow
+                    </Button>
+                </Box>
+            </form>
+        </Box>
+    );
+}
