@@ -1,5 +1,5 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -37,37 +37,58 @@ function formatDateTime(s: string) {
 export function TestHistoryPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const testId = id ? parseInt(id, 10) : null;
 
   const [test, setTest] = useState<TestRequest | null>(null);
   const [runs, setRuns] = useState<TestRun[]>([]);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+
+  const page = parseInt(searchParams.get('page') || '0', 10);
+  const pageSize = parseInt(searchParams.get('limit') || '20', 10);
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams(prev => {
+      prev.set('page', newPage.toString());
+      return prev;
+    });
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setSearchParams(prev => {
+      prev.set('limit', newSize.toString());
+      prev.set('page', '0');
+      return prev;
+    });
+  };
 
   useEffect(() => {
-    if (testId) {
-      setLoading(true);
-      Promise.all([
-        api.getTest(testId),
-        api.listRuns(testId),
-      ])
-        .then(([t, r]) => {
-          setTest(t);
-          setRuns(r);
-          setPage(0);
-        })
-        .catch(() => navigate('/p'))
-        .finally(() => setLoading(false));
-    } else {
+    if (!testId) {
       navigate('/p');
+      return;
     }
+
+    setLoading(true);
+    api.getTest(testId)
+      .then(setTest)
+      .catch(() => navigate('/p'))
+      .finally(() => setLoading(false));
   }, [testId, navigate]);
 
-  const paginatedRuns = useMemo(() => {
-    const start = page * pageSize;
-    return runs.slice(start, start + pageSize);
-  }, [runs, page, pageSize]);
+  useEffect(() => {
+    if (!testId) return;
+
+    setLoading(true);
+    // page+1 because backend is 1-indexed, frontend is 0-indexed
+    api.listRuns(testId, page + 1, pageSize)
+      .then((res) => {
+        setRuns(res.data);
+        setTotalItems(res.total);
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [testId, page, pageSize]);
 
   if (!test) {
     return (
@@ -119,9 +140,9 @@ export function TestHistoryPage() {
               <DataTablePagination
                 page={page}
                 pageSize={pageSize}
-                totalItems={runs.length}
-                onPageChange={setPage}
-                onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+                totalItems={totalItems}
+                onPageChange={handlePageChange}
+                onPageSizeChange={handlePageSizeChange}
               />
             }
           >
@@ -137,7 +158,7 @@ export function TestHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {paginatedRuns.map((run) => (
+                {runs.map((run) => (
                   <tr key={run.id}>
                     <td>
                       {run.status === 'passed' ? (

@@ -150,11 +150,11 @@ export function Layout() {
       {/* Footer Info */}
       <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', mt: 'auto', display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: 'primary.500', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800 }}>Z</Typography>
+          <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800 }}>D</Typography>
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography level="body-xs" fontWeight={700}>Zotlo Test Suite</Typography>
-          <Typography level="body-xs" textColor="neutral.500">v1.2.0 • Pro</Typography>
+          <Typography level="body-xs" fontWeight={700}>DreamWorks Suite</Typography>
+          <Typography level="body-xs" textColor="neutral.500">v1.3.0 • Premium</Typography>
         </Box>
       </Box>
     </Box>

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"zotlotestsuite/internal/config"
-	"zotlotestsuite/internal/models"
+	"dreamworks/internal/config"
+	"dreamworks/internal/models"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

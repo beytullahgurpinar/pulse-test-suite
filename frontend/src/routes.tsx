@@ -34,9 +34,9 @@ export const router = createBrowserRouter([
       { path: 'p/:projectId/flows/:id/history', element: <FlowHistoryPage /> },
       { path: 'flows/runs/:runId', element: <FlowRunResultPage /> },
       { path: 'runs/:runId', element: <RunResultPage /> },
-      { path: 'tests/:id', element: <TestDetailPage /> },
-      { path: 'tests/:id/edit', element: <TestFormPage /> },
-      { path: 'tests/:id/history', element: <TestHistoryPage /> },
+      { path: 'p/:projectId/tests/:id', element: <TestDetailPage /> },
+      { path: 'p/:projectId/tests/:id/edit', element: <TestFormPage /> },
+      { path: 'p/:projectId/tests/:id/history', element: <TestHistoryPage /> },
     ],
   },
 ]);

@@ -140,4 +140,4 @@ export const theme = extendTheme({
   },
 });
 
-export const modeStorageKey = 'zotlo-color-mode';
+export const modeStorageKey = 'dreamworks-color-mode';

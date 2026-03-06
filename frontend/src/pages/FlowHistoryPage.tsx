@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import {
     Box,
     Typography,
     Table,
     Button,
     CircularProgress,
-    Sheet,
     Chip,
 } from '@mui/joy';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
@@ -16,11 +15,12 @@ import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import type { FlowRun, Flow } from '../types';
 import { api } from '../api';
 import { PageHeader } from '../components/PageHeader';
-import { tableStyles } from '../components/DataTable';
+import { tableStyles, DataTableWrapper, DataTablePagination } from '../components/DataTable';
 
 export function FlowHistoryPage() {
     const { id, projectId } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const flowId = id ? parseInt(id, 10) : null;
     const pid = projectId ? parseInt(projectId, 10) : null;
 
@@ -28,35 +28,65 @@ export function FlowHistoryPage() {
     const [runs, setRuns] = useState<FlowRun[]>([]);
     const [loading, setLoading] = useState(true);
     const [running, setRunning] = useState(false);
+    const [totalItems, setTotalItems] = useState(0);
 
-    const loadData = async () => {
+    const page = parseInt(searchParams.get('page') || '0', 10);
+    const pageSize = parseInt(searchParams.get('limit') || '20', 10);
+
+    const handlePageChange = (newPage: number) => {
+        setSearchParams(prev => {
+            prev.set('page', newPage.toString());
+            return prev;
+        });
+    };
+
+    const handlePageSizeChange = (newSize: number) => {
+        setSearchParams(prev => {
+            prev.set('limit', newSize.toString());
+            prev.set('page', '0');
+            return prev;
+        });
+    };
+
+    const loadFlow = async () => {
+        if (!flowId) return;
+        try {
+            const f = await api.getFlow(flowId);
+            setFlow(f);
+        } catch (err) {
+            console.error('Failed to load flow:', err);
+        }
+    };
+
+    const loadRuns = async () => {
         if (!flowId) return;
         setLoading(true);
         try {
-            const [f, rs] = await Promise.all([
-                api.getFlow(flowId),
-                api.listFlowRuns(flowId),
-            ]);
-            console.log('Flow History loaded:', { flow: f, runs: rs });
-            setFlow(f);
-            setRuns(rs);
+            const rs = await api.listFlowRuns(flowId, page + 1, pageSize);
+            setRuns(rs.data);
+            setTotalItems(rs.total);
         } catch (err) {
-            console.error('Failed to load flow history:', err);
+            console.error('Failed to load flow runs:', err);
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        loadData();
+        loadFlow();
     }, [flowId]);
+
+    useEffect(() => {
+        loadRuns();
+    }, [flowId, page, pageSize]);
 
     const handleRun = async () => {
         if (!flowId) return;
         setRunning(true);
         try {
             await api.runFlow(flowId);
-            await loadData();
+            handlePageChange(0);
+            await loadRuns();
         } catch (err) {
             console.error(err);
             alert('Failed to run flow');
@@ -105,17 +135,16 @@ export function FlowHistoryPage() {
                 }
             />
 
-            <Sheet
-                variant="outlined"
-                sx={{
-                    borderRadius: '12px',
-                    overflow: 'hidden',
-                    border: '1px solid',
-                    borderColor: 'neutral.200',
-                    '[data-joy-color-scheme="dark"] &': {
-                        borderColor: 'neutral.300',
-                    },
-                }}
+            <DataTableWrapper
+                pagination={
+                    <DataTablePagination
+                        page={page}
+                        pageSize={pageSize}
+                        totalItems={totalItems}
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                    />
+                }
             >
                 <Box sx={{ overflowX: 'auto', p: 0 }}>
                     <Table sx={{ ...tableStyles, width: '100%', minWidth: 600, tableLayout: 'auto' }}>
@@ -183,7 +212,7 @@ export function FlowHistoryPage() {
                         </tbody>
                     </Table>
                 </Box>
-            </Sheet>
+            </DataTableWrapper>
         </Box>
     );
 }

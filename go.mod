@@ -1,4 +1,4 @@
-module zotlotestsuite
+module dreamworks
 
 go 1.24.0
 

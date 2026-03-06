@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -34,6 +34,7 @@ import { api } from '../api';
 
 export function ProjectsPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { loadProjects: refreshSidebar } = useOutletContext<{ loadProjects: () => void }>();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,8 +42,24 @@ export function ProjectsPage() {
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formName, setFormName] = useState('');
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+
+  const page = parseInt(searchParams.get('page') || '0', 10);
+  const pageSize = parseInt(searchParams.get('limit') || '20', 10);
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams(prev => {
+      prev.set('page', newPage.toString());
+      return prev;
+    });
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setSearchParams(prev => {
+      prev.set('limit', newSize.toString());
+      prev.set('page', '0');
+      return prev;
+    });
+  };
 
   const paginatedProjects = useMemo(() => {
     const start = page * pageSize;
@@ -147,8 +164,8 @@ export function ProjectsPage() {
               page={page}
               pageSize={pageSize}
               totalItems={projects.length}
-              onPageChange={setPage}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
             />
           }
         >
@@ -162,44 +179,44 @@ export function ProjectsPage() {
             </thead>
             <tbody>
               {paginatedProjects.map((p) => (
-                    <tr key={p.id}>
-                      <td>
-                        <FolderIcon sx={{ color: 'primary.500', fontSize: 22 }} />
-                      </td>
-                      <td>
-                        <Typography
-                          level="title-sm"
-                          fontWeight={600}
-                          sx={{ cursor: 'pointer', '&:hover': { color: 'primary.600' } }}
-                          onClick={() => navigate(`/p/${p.id}`)}
-                        >
-                          {p.name}
-                        </Typography>
-                      </td>
-                      <td>
-                        <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'flex-end' }}>
-                          <Button size="sm" variant="soft" color="primary" startDecorator={<OpenInNewIcon />} onClick={() => navigate(`/p/${p.id}`)} sx={{ fontWeight: 600 }}>
-                            Open
-                          </Button>
-                          <Dropdown>
-                            <MenuButton slots={{ root: IconButton }} slotProps={{ root: { variant: 'plain', color: 'neutral', size: 'sm' } }} sx={{ '--IconButton-size': '34px' }}>
-                              <MoreVertIcon />
-                            </MenuButton>
-                            <Menu size="sm" sx={{ minWidth: 160 }}>
-                              <MenuItem onClick={() => handleOpenEdit(p)}>
-                                <EditIcon sx={{ mr: 1.5 }} fontSize="small" />
-                                Edit
-                              </MenuItem>
-                              <ListDivider />
-                              <MenuItem color="danger" onClick={() => handleDelete(p.id)}>
-                                <DeleteIcon sx={{ mr: 1.5 }} fontSize="small" />
-                                Delete
-                              </MenuItem>
-                            </Menu>
-                          </Dropdown>
-                        </Box>
-                      </td>
-                    </tr>
+                <tr key={p.id}>
+                  <td>
+                    <FolderIcon sx={{ color: 'primary.500', fontSize: 22 }} />
+                  </td>
+                  <td>
+                    <Typography
+                      level="title-sm"
+                      fontWeight={600}
+                      sx={{ cursor: 'pointer', '&:hover': { color: 'primary.600' } }}
+                      onClick={() => navigate(`/p/${p.id}`)}
+                    >
+                      {p.name}
+                    </Typography>
+                  </td>
+                  <td>
+                    <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', justifyContent: 'flex-end' }}>
+                      <Button size="sm" variant="soft" color="primary" startDecorator={<OpenInNewIcon />} onClick={() => navigate(`/p/${p.id}`)} sx={{ fontWeight: 600 }}>
+                        Open
+                      </Button>
+                      <Dropdown>
+                        <MenuButton slots={{ root: IconButton }} slotProps={{ root: { variant: 'plain', color: 'neutral', size: 'sm' } }} sx={{ '--IconButton-size': '34px' }}>
+                          <MoreVertIcon />
+                        </MenuButton>
+                        <Menu size="sm" sx={{ minWidth: 160 }}>
+                          <MenuItem onClick={() => handleOpenEdit(p)}>
+                            <EditIcon sx={{ mr: 1.5 }} fontSize="small" />
+                            Edit
+                          </MenuItem>
+                          <ListDivider />
+                          <MenuItem color="danger" onClick={() => handleDelete(p.id)}>
+                            <DeleteIcon sx={{ mr: 1.5 }} fontSize="small" />
+                            Delete
+                          </MenuItem>
+                        </Menu>
+                      </Dropdown>
+                    </Box>
+                  </td>
+                </tr>
               ))}
             </tbody>
           </Table>

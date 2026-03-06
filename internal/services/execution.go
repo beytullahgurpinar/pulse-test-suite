@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"zotlotestsuite/internal/crypto"
-	"zotlotestsuite/internal/models"
-	"zotlotestsuite/internal/runner"
+	"dreamworks/internal/crypto"
+	"dreamworks/internal/models"
+	"dreamworks/internal/runner"
 
 	"github.com/tidwall/gjson"
 	"gorm.io/gorm"

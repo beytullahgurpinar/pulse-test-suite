@@ -9,7 +9,7 @@ import {
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
-const PAGE_SIZES = [10, 25, 50];
+const PAGE_SIZES = [10, 20, 50, 100];
 
 export const tableStyles = {
   width: '100%',

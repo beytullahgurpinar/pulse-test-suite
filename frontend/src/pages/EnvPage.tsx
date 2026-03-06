@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
@@ -38,6 +38,7 @@ import { api } from '../api';
 export function EnvPage() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const pid = projectId ? parseInt(projectId, 10) : null;
 
   const [vars, setVars] = useState<EnvVar[]>([]);
@@ -48,8 +49,24 @@ export function EnvPage() {
   const [formValue, setFormValue] = useState('');
   const [formSecured, setFormSecured] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(10);
+
+  const page = parseInt(searchParams.get('page') || '0', 10);
+  const pageSize = parseInt(searchParams.get('limit') || '20', 10);
+
+  const handlePageChange = (newPage: number) => {
+    setSearchParams(prev => {
+      prev.set('page', newPage.toString());
+      return prev;
+    });
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setSearchParams(prev => {
+      prev.set('limit', newSize.toString());
+      prev.set('page', '0');
+      return prev;
+    });
+  };
 
   const paginatedVars = useMemo(() => {
     const start = page * pageSize;
@@ -180,8 +197,8 @@ export function EnvPage() {
               page={page}
               pageSize={pageSize}
               totalItems={vars.length}
-              onPageChange={setPage}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(0); }}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
             />
           }
         >

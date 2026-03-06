@@ -65,7 +65,7 @@ export function TestsPage() {
         }
     }, [pid]);
 
-    const handleEdit = (id: number) => navigate(`/tests/${id}/edit`);
+    const handleEdit = (id: number) => navigate(`/p/${pid}/tests/${id}/edit`);
     const handleRun = async (id: number) => {
         setLastResult(null);
         setRunningTestId(id);
@@ -196,8 +196,9 @@ export function TestsPage() {
                             onEdit={handleEdit}
                             onRun={handleRun}
                             onDuplicate={(id) => api.duplicateTest(id).then(() => loadData(pid))}
-                            onHistory={(id) => navigate(`/tests/${id}/history`)}
+                            onHistory={(id) => navigate(`/p/${pid}/tests/${id}/history`)}
                             runningTestId={runningTestId}
+                            projectId={pid}
                         />
                     </Card>
 

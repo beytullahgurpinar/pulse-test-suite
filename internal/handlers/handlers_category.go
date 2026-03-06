@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"zotlotestsuite/internal/models"
+	"dreamworks/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

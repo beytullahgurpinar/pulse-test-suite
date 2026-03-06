@@ -3,12 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
-	"zotlotestsuite/internal/crypto"
-	"zotlotestsuite/internal/models"
-	"zotlotestsuite/internal/runner"
-	"zotlotestsuite/internal/services"
+	"dreamworks/internal/crypto"
+	"dreamworks/internal/models"
+	"dreamworks/internal/runner"
+	"dreamworks/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -490,19 +491,39 @@ func (h *Handler) RunAllTests(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"results": results})
 }
 
-// ListTestRuns - Test çalıştırma geçmişi
+// ListTestRuns - Test çalıştırma geçmişi (paginated)
 func (h *Handler) ListTestRuns(c *gin.Context) {
 	testID := c.Query("testId")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
 	var runs []models.TestRun
-	q := h.DB.Order("created_at DESC").Limit(100)
+	q := h.DB.Model(&models.TestRun{}).Order("created_at DESC")
 	if testID != "" {
 		q = q.Where("test_request_id = ?", testID)
 	}
-	if err := q.Find(&runs).Error; err != nil {
+
+	var total int64
+	q.Count(&total)
+
+	if err := q.Limit(limit).Offset(offset).Find(&runs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, runs)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  runs,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 // GetTestRun - Single run detail (for modal)

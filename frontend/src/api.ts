@@ -1,4 +1,7 @@
-import type { TestRequest, RunResult, TestRun, Project, EnvVar, DashboardData, Schedule, Category, Flow, FlowRun } from './types';
+import type {
+  TestRequest, RunResult, TestRun, Project, EnvVar, DashboardData,
+  Schedule, Category, Flow, FlowRun, PaginatedResponse
+} from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
@@ -64,8 +67,8 @@ export const api = {
       `/tests/run-all${projectId ? `?projectId=${projectId}` : ''}`,
       { method: 'POST' }
     ),
-  listRuns: (testId?: number) =>
-    fetchApi<TestRun[]>(`/runs${testId ? `?testId=${testId}` : ''}`),
+  listRuns: (testId?: number, page: number = 1, limit: number = 20) =>
+    fetchApi<PaginatedResponse<TestRun>>(`/runs?page=${page}&limit=${limit}${testId ? `&testId=${testId}` : ''}`),
   getRun: (id: number) =>
     fetchApi<RunResult & { createdAt?: string }>(`/runs/${id}`),
 
@@ -97,8 +100,8 @@ export const api = {
     fetchApi<{ message: string }>(`/flows/${id}`, { method: 'DELETE' }),
   runFlow: (id: number) =>
     fetchApi<FlowRun>(`/flows/${id}/run`, { method: 'POST' }),
-  listFlowRuns: (flowId?: number) =>
-    fetchApi<FlowRun[]>(`/flows/runs${flowId ? `?flowId=${flowId}` : ''}`),
+  listFlowRuns: (flowId?: number, page: number = 1, limit: number = 20) =>
+    fetchApi<PaginatedResponse<FlowRun>>(`/flows/runs?page=${page}&limit=${limit}${flowId ? `&flowId=${flowId}` : ''}`),
   getFlowRun: (id: number) =>
     fetchApi<FlowRun>(`/flows/runs/${id}`),
 };

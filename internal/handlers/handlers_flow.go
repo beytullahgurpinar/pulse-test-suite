@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"zotlotestsuite/internal/models"
+	"dreamworks/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -136,21 +136,40 @@ func (h *Handler) RunFlow(c *gin.Context) {
 
 func (h *Handler) ListFlowRuns(c *gin.Context) {
 	flowID := c.Query("flowId")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	if page < 1 {
+		page = 1
+	}
+	if limit < 1 || limit > 100 {
+		limit = 20
+	}
+	offset := (page - 1) * limit
+
 	var runs []models.FlowRun
-	q := h.DB.Order("created_at DESC").Limit(100)
+	q := h.DB.Model(&models.FlowRun{}).Order("created_at DESC")
 	if flowID != "" {
-		// Try to parse to uint to avoid string-binding issues in some DB drivers
 		if fid, err := strconv.Atoi(flowID); err == nil {
 			q = q.Where("flow_id = ?", fid)
 		} else {
 			q = q.Where("flow_id = ?", flowID)
 		}
 	}
-	if err := q.Find(&runs).Error; err != nil {
+
+	var total int64
+	q.Count(&total)
+
+	if err := q.Limit(limit).Offset(offset).Find(&runs).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, runs)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data":  runs,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
 }
 
 func (h *Handler) GetFlowRun(c *gin.Context) {

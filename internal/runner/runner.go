@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"zotlotestsuite/internal/models"
+	"dreamworks/internal/models"
 
 	"github.com/tidwall/gjson"
 )

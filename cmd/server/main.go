@@ -7,11 +7,11 @@ import (
 	"path"
 	"strings"
 
-	"zotlotestsuite/internal/config"
-	"zotlotestsuite/internal/database"
-	"zotlotestsuite/internal/handlers"
-	"zotlotestsuite/internal/scheduler"
-	"zotlotestsuite/internal/static"
+	"dreamworks/internal/config"
+	"dreamworks/internal/database"
+	"dreamworks/internal/handlers"
+	"dreamworks/internal/scheduler"
+	"dreamworks/internal/static"
 
 	"github.com/gin-gonic/gin"
 )

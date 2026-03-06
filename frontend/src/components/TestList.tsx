@@ -37,9 +37,10 @@ interface Props {
   onDuplicate?: (id: number) => void;
   onHistory?: (id: number) => void;
   runningTestId?: number | null;
+  projectId?: number | null;
 }
 
-export function TestList({ tests, categories = [], onRefresh, onEdit, onRun, onDuplicate, onHistory, runningTestId = null }: Props) {
+export function TestList({ tests, categories = [], onRefresh, onEdit, onRun, onDuplicate, onHistory, runningTestId = null, projectId = null }: Props) {
   const navigate = useNavigate();
   const [deleting, setDeleting] = useState<number | null>(null);
   const [duplicating, setDuplicating] = useState<number | null>(null);
@@ -168,7 +169,7 @@ export function TestList({ tests, categories = [], onRefresh, onEdit, onRun, onD
                 transition: 'color 0.15s ease',
                 fontSize: '0.85rem',
               }}
-              onClick={() => navigate(`/tests/${t.id}`)}
+              onClick={() => navigate(`/p/${projectId}/tests/${t.id}`)}
             >
               {t.name}
             </Typography>

@@ -11,7 +11,7 @@ import { api } from '../api';
 import { RunResults } from '../components/RunResults';
 
 export function TestDetailPage() {
-  const { id } = useParams();
+  const { projectId, id } = useParams();
   const navigate = useNavigate();
   const testId = id ? parseInt(id, 10) : null;
 
@@ -64,7 +64,7 @@ export function TestDetailPage() {
             <Button
               variant="outlined"
               startDecorator={<HistoryIcon />}
-              onClick={() => navigate(`/tests/${testId}/history`)}
+              onClick={() => navigate(`/p/${projectId}/tests/${testId}/history`)}
               sx={{ fontWeight: 600 }}
             >
               History
@@ -72,7 +72,7 @@ export function TestDetailPage() {
             <Button
               variant="outlined"
               startDecorator={<EditIcon />}
-              onClick={() => navigate(`/tests/${testId}/edit`)}
+              onClick={() => navigate(`/p/${projectId}/tests/${testId}/edit`)}
               sx={{ fontWeight: 600 }}
             >
               Edit

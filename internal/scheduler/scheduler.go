@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"zotlotestsuite/internal/models"
-	"zotlotestsuite/internal/services"
+	"dreamworks/internal/models"
+	"dreamworks/internal/services"
 
 	"gorm.io/gorm"
 )

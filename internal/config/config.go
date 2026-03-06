@@ -7,13 +7,13 @@ import (
 )
 
 type Config struct {
-	MySQLHost      string
-	MySQLPort      string
-	MySQLUser      string
-	MySQLPassword  string
-	MySQLDatabase  string
-	Port           string
-	EncryptionKey  string // ENCRYPTION_KEY or SECRET_KEY - for encrypting secured env vars
+	MySQLHost     string
+	MySQLPort     string
+	MySQLUser     string
+	MySQLPassword string
+	MySQLDatabase string
+	Port          string
+	EncryptionKey string // ENCRYPTION_KEY or SECRET_KEY - for encrypting secured env vars
 }
 
 func Load() (*Config, error) {
@@ -21,7 +21,7 @@ func Load() (*Config, error) {
 
 	encKey := getEnv("ENCRYPTION_KEY", getEnv("SECRET_KEY", ""))
 	if encKey == "" {
-		encKey = "zotlo-default-secret-change-in-production" // fallback for dev
+		encKey = "dreamworks-default-secret-change-in-production" // fallback for dev
 	}
 
 	return &Config{
@@ -29,7 +29,7 @@ func Load() (*Config, error) {
 		MySQLPort:     getEnv("MYSQL_PORT", "3306"),
 		MySQLUser:     getEnv("MYSQL_USER", "root"),
 		MySQLPassword: getEnv("MYSQL_PASSWORD", "password"),
-		MySQLDatabase: getEnv("MYSQL_DATABASE", "zotlo_tests"),
+		MySQLDatabase: getEnv("MYSQL_DATABASE", "dreamworks_db"),
 		Port:          getEnv("PORT", "8181"),
 		EncryptionKey: encKey,
 	}, nil
