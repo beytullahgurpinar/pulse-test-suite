@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"net/http"
-	"dreamworks/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
 
 	"github.com/gin-gonic/gin"
 )

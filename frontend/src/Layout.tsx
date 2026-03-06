@@ -153,7 +153,7 @@ export function Layout() {
           <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800 }}>D</Typography>
         </Box>
         <Box sx={{ minWidth: 0 }}>
-          <Typography level="body-xs" fontWeight={700}>DreamWorks Suite</Typography>
+          <Typography level="body-xs" fontWeight={700}>Pulse Test Suite</Typography>
           <Typography level="body-xs" textColor="neutral.500">v1.3.0 • Premium</Typography>
         </Box>
       </Box>
@@ -181,7 +181,7 @@ export function Layout() {
           <Box sx={{ width: 36, height: 36, borderRadius: '10px', background: 'linear-gradient(135deg, #4c6ef5, #5c7cfa)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <ScienceRoundedIcon sx={{ color: '#fff' }} />
           </Box>
-          <Typography level="title-md" fontWeight={800} letterSpacing="-0.02em">DreamWorks</Typography>
+          <Typography level="title-md" fontWeight={800} letterSpacing="-0.02em">Pulse</Typography>
           <Box sx={{ ml: 'auto' }}>
             <ColorSchemeToggle />
           </Box>
@@ -194,7 +194,7 @@ export function Layout() {
         <IconButton variant="plain" onClick={() => setMobileDrawerOpen(true)}>
           <MenuIcon />
         </IconButton>
-        <Typography level="title-md" fontWeight={800} sx={{ ml: 1 }}>DreamWorks</Typography>
+        <Typography level="title-md" fontWeight={800} sx={{ ml: 1 }}>Pulse</Typography>
         <Box sx={{ ml: 'auto' }}>
           <ColorSchemeToggle />
         </Box>

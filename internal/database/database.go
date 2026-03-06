@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 
-	"dreamworks/internal/config"
-	"dreamworks/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/config"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

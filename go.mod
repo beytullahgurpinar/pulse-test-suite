@@ -1,4 +1,4 @@
-module dreamworks
+module github.com/beytullahgurpinar/pulse-test-suite
 
 go 1.24.0
 

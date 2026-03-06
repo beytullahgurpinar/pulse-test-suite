@@ -21,7 +21,7 @@ func Load() (*Config, error) {
 
 	encKey := getEnv("ENCRYPTION_KEY", getEnv("SECRET_KEY", ""))
 	if encKey == "" {
-		encKey = "dreamworks-default-secret-change-in-production" // fallback for dev
+		encKey = "pulse-suite-secret-key-change-it" // fallback for dev
 	}
 
 	return &Config{
@@ -29,7 +29,7 @@ func Load() (*Config, error) {
 		MySQLPort:     getEnv("MYSQL_PORT", "3306"),
 		MySQLUser:     getEnv("MYSQL_USER", "root"),
 		MySQLPassword: getEnv("MYSQL_PASSWORD", "password"),
-		MySQLDatabase: getEnv("MYSQL_DATABASE", "dreamworks_db"),
+		MySQLDatabase: getEnv("MYSQL_DATABASE", "pulse_db"),
 		Port:          getEnv("PORT", "8181"),
 		EncryptionKey: encKey,
 	}, nil

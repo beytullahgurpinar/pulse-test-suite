@@ -1,15 +1,15 @@
-# 🎬 DreamWorks API Test Suite
+# 🎬 Pulse Test Suite
 
 ### *The Professional-Grade API Monitoring & Workflow Orchestration Platform.*
 
-**DreamWorks** is a powerful, developer-centric platform designed for teams that need to go beyond simple manual API calls. It combines automated testing, multi-step workflow orchestration, and 24/7 monitoring into a sleek, premium experience. Whether you're debugging a single endpoint or monitoring a complex microservices architecture, DreamWorks has you covered.
+**Pulse Test Suite** is a powerful, developer-centric platform designed for teams that need to go beyond simple manual API calls. It combines automated testing, multi-step workflow orchestration, and 24/7 monitoring into a sleek, premium experience. Whether you're debugging a single endpoint or monitoring a complex microservices architecture, Pulse has you covered.
 
 ---
 
-## 🔥 Key Pillars of DreamWorks
+## 🔥 Key Pillars
 
 ### 🧪 1. Intelligent Test Creation
-Define your API requests with precision. DreamWorks supports:
+Define your API requests with precision. **Pulse** supports:
 -   **Dynamic Payloads**: Use JSON for body and headers with full support for environment variables `{{variable}}`.
 -   **Mock Data Injection**: Automatically generate random values (UUIDs, names, emails, credit cards, dates) at runtime using built-in placeholders.
 -   **Multi-Method Support**: Full CRUD (GET, POST, PUT, DELETE, PATCH, etc.) support.
@@ -26,7 +26,7 @@ Turn your tests into a pro-active monitoring system.
 -   **Project-Scoped Schedulers**: Manage different schedules for each of your microservices or environments.
 
 ### 🔒 4. The Security Vault (Environment Management)
-Security is not an afterthought in DreamWorks.
+Security is not an afterthought in **Pulse**.
 -   **AES-256 Encryption**: All sensitive keys, tokens, and secrets are encrypted at rest in the database.
 -   **UI Masking**: Secured variables are never shown in plain text; they appear as `secret:***` in history logs and reports.
 -   **Project Isolation**: Keep your `Development`, `Staging`, and `Production` variables strictly separated.
@@ -46,13 +46,13 @@ High-fidelity data visualization for technical leads.
 
 ## 🚀 Getting Started
 
-DreamWorks is designed to be self-hostable and lightweight.
+**Pulse** is designed to be self-hostable and lightweight.
 
 ### 🐳 Quick Start with Docker
 ```bash
 # Clone the vision
-git clone https://github.com/your-repo/dreamworks.git
-cd dreamworks
+git clone https://github.com/beytullahgurpinar/pulse-test-suite.git
+cd pulse-test-suite
 
 # Launch everything
 docker-compose up -d --build
@@ -63,7 +63,7 @@ Your monitoring suite is now live at **[http://localhost:8181](http://localhost:
 
 ## 🛠️ Technical Foundation
 
-DreamWorks is built on a stack designed for performance and reliability:
+**Pulse** is built on a stack designed for performance and reliability:
 -   **Backend**: Go (High-concurrency and blazing fast execution).
 -   **Frontend**: React + TypeScript (Type-safe and interactive UI).
 -   **Aesthetics**: Joy UI (Premium, modern design system).
@@ -81,6 +81,16 @@ Validate your API results with a variety of built-in operators:
 ---
 
 ## 🤝 Community & Support
-DreamWorks is an open-source initiative. We welcome pull requests for new assertion operators, dark mode enhancements, or performance optimizations!
+**Pulse** is a source-available initiative. We welcome pull requests for new assertion operators, dark mode enhancements, or performance optimizations!
 
-Developed with ❤️ by **DreamWorks Maintenance Team**
+---
+
+## ⚖️ License
+
+This project is licensed under the **MIT License + Commons Clause 1.0**.
+
+**Pulse** is free for individuals, students, and open-source development. However, the **Commons Clause** prohibits the sale of the software or providing it as a commercial service (SaaS) where the primary value is derived from this software itself.
+
+*See the [LICENSE](LICENSE) file for the full text.*
+
+Developed with ❤️ by **Beytullah Gürpınar**

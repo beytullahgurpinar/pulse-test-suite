@@ -6,9 +6,9 @@ import (
 	"sort"
 	"strings"
 
-	"dreamworks/internal/crypto"
-	"dreamworks/internal/models"
-	"dreamworks/internal/runner"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/crypto"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/runner"
 
 	"github.com/tidwall/gjson"
 	"gorm.io/gorm"

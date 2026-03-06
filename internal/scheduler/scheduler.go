@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"dreamworks/internal/models"
-	"dreamworks/internal/services"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/services"
 
 	"gorm.io/gorm"
 )

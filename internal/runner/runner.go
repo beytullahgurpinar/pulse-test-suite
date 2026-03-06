@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"dreamworks/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
 
 	"github.com/tidwall/gjson"
 )

@@ -7,11 +7,11 @@ import (
 	"path"
 	"strings"
 
-	"dreamworks/internal/config"
-	"dreamworks/internal/database"
-	"dreamworks/internal/handlers"
-	"dreamworks/internal/scheduler"
-	"dreamworks/internal/static"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/config"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/database"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/handlers"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/scheduler"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/static"
 
 	"github.com/gin-gonic/gin"
 )

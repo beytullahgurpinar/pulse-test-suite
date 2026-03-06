@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"dreamworks/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

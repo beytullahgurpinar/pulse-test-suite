@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"time"
 
-	"dreamworks/internal/crypto"
-	"dreamworks/internal/models"
-	"dreamworks/internal/runner"
-	"dreamworks/internal/services"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/crypto"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/runner"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/services"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
