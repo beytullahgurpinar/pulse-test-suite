@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -13,6 +15,47 @@ import (
 
 	"github.com/tidwall/gjson"
 )
+
+// isPrivateIP checks if an IP is in a private/reserved range (SSRF protection)
+func isPrivateIP(ip net.IP) bool {
+	privateRanges := []string{
+		"127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+		"169.254.0.0/16", "::1/128", "fc00::/7", "fe80::/10",
+	}
+	for _, cidr := range privateRanges {
+		_, network, _ := net.ParseCIDR(cidr)
+		if network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+// validateTestURL blocks requests to internal/private addresses
+func validateTestURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("invalid URL: %w", err)
+	}
+	host := u.Hostname()
+	if host == "" {
+		return fmt.Errorf("empty hostname")
+	}
+	// Block cloud metadata endpoints
+	if host == "169.254.169.254" || host == "metadata.google.internal" {
+		return fmt.Errorf("access to cloud metadata is blocked")
+	}
+	ips, err := net.LookupIP(host)
+	if err != nil {
+		return nil // let the HTTP client handle DNS failures
+	}
+	for _, ip := range ips {
+		if isPrivateIP(ip) {
+			return fmt.Errorf("access to private/internal addresses is blocked")
+		}
+	}
+	return nil
+}
 
 type AssertionResult struct {
 	AssertionID uint   `json:"assertionId"`
@@ -54,6 +97,13 @@ func ExecuteTest(req *models.TestRequest, envVars map[string]string) *RunResult 
 	result.RequestHeaders = reqSnapshot.Headers
 	result.RequestBody = reqSnapshot.Body
 
+	// SSRF protection: block requests to private/internal addresses
+	if err := validateTestURL(reqSnapshot.URL); err != nil {
+		result.Error = err.Error()
+		result.Passed = false
+		return result
+	}
+
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(httpReq)
 	result.DurationMs = time.Since(start).Milliseconds()
@@ -92,7 +142,14 @@ type requestSnapshot struct {
 
 func buildRequest(req *models.TestRequest, envVars map[string]string) (*http.Request, *requestSnapshot, error) {
 	// Process env vars and placeholders ({{guid}}, {{email}}, etc.)
+	method := strings.ToUpper(req.Method)
 	body := ProcessWithEnv(req.Body, envVars)
+
+	// GET and HEAD must not carry a body
+	bodyless := method == "GET" || method == "HEAD"
+	if bodyless {
+		body = ""
+	}
 
 	var bodyReader io.Reader
 	if body != "" {
@@ -100,7 +157,7 @@ func buildRequest(req *models.TestRequest, envVars map[string]string) (*http.Req
 	}
 
 	url := ProcessWithEnv(req.URL, envVars)
-	httpReq, err := http.NewRequest(strings.ToUpper(req.Method), url, bodyReader)
+	httpReq, err := http.NewRequest(method, url, bodyReader)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -115,11 +172,14 @@ func buildRequest(req *models.TestRequest, envVars map[string]string) (*http.Req
 			}
 		}
 	}
-	httpReq.Header.Set("Content-Type", "application/json")
-	headers["Content-Type"] = "application/json"
+	// Only set Content-Type for requests that actually send a body
+	if !bodyless && body != "" {
+		httpReq.Header.Set("Content-Type", "application/json")
+		headers["Content-Type"] = "application/json"
+	}
 
 	snapshot := &requestSnapshot{
-		Method:  strings.ToUpper(req.Method),
+		Method:  method,
 		URL:     url,
 		Headers: headers,
 		Body:    body,

@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
 
 	"github.com/gin-gonic/gin"
@@ -10,13 +12,24 @@ import (
 // --- Categories ---
 
 func (h *Handler) ListCategories(c *gin.Context) {
-	projectID := c.Query("projectId")
-	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "projectId required"})
-		return
-	}
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	var list []models.Category
-	if err := h.DB.Where("project_id = ?", projectID).Find(&list).Error; err != nil {
+	q := h.DB.Order("name ASC")
+
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Where("project_id = ?", pid)
+	} else {
+		q = q.Joins("JOIN projects ON projects.id = categories.project_id").Where("projects.workspace_id = ?", wsID)
+	}
+
+	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -31,6 +44,10 @@ func (h *Handler) CreateCategory(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	cat := models.Category{
@@ -51,6 +68,10 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	if !h.hasProject(c, cat.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	var body struct {
 		Name     string `json:"name"`
 		ParentID *uint  `json:"parentId"`
@@ -66,10 +87,20 @@ func (h *Handler) UpdateCategory(c *gin.Context) {
 }
 
 func (h *Handler) DeleteCategory(c *gin.Context) {
+	var cat models.Category
+	if err := h.DB.First(&cat, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, cat.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
 	id := c.Param("id")
 	h.DB.Model(&models.TestRequest{}).Where("category_id = ?", id).Update("category_id", nil)
 	h.DB.Where("parent_id = ?", id).Delete(&models.Category{})
-	if err := h.DB.Delete(&models.Category{}, id).Error; err != nil {
+	if err := h.DB.Delete(&cat).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

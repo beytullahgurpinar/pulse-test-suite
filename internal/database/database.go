@@ -22,7 +22,11 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 
 	// Auto migration - creates tables if not exist, applies schema changes
 	log.Println("Database migration starting...")
+	// Auto migration - creates tables if not exist, applies schema changes
+	log.Println("Database migration starting...")
 	if err := db.AutoMigrate(
+		&models.Workspace{},
+		&models.User{},
 		&models.Project{},
 		&models.Category{},
 		&models.EnvVar{},
@@ -34,16 +38,30 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		&models.FlowStep{},
 		&models.FlowRun{},
 		&models.FlowRunStep{},
+		&models.Invitation{},
 	); err != nil {
 		return nil, err
 	}
 	log.Println("Database migration completed.")
 
-	// Varsayılan proje ve mevcut testleri ata
-	var count int64
-	db.Model(&models.Project{}).Count(&count)
-	if count == 0 {
-		p := models.Project{Name: "Varsayılan Proje"}
+	// Ensure default workspace exists
+	var ws models.Workspace
+	if err := db.First(&ws).Error; err != nil {
+		// No workspace found, create one
+		ws = models.Workspace{Name: "General Workspace"}
+		db.Create(&ws)
+	}
+
+	// Update existing data if they have workspace_id = 0
+	db.Model(&models.Project{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
+	db.Model(&models.TestRun{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
+	db.Model(&models.FlowRun{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
+
+	// Ensure atleast one project exists
+	var pCount int64
+	db.Model(&models.Project{}).Count(&pCount)
+	if pCount == 0 {
+		p := models.Project{Name: "Sample Project", WorkspaceID: ws.ID}
 		db.Create(&p)
 		db.Model(&models.TestRequest{}).Where("project_id = 0").Update("project_id", p.ID)
 	}

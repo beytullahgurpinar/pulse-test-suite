@@ -35,6 +35,27 @@ interface Props {
 }
 
 const METHOD_OPTIONS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+const BODYLESS_METHODS = new Set(['GET', 'HEAD', 'DELETE']);
+
+function parseQueryParams(url: string): { baseUrl: string; params: { key: string; value: string }[] } {
+  const qIdx = url.indexOf('?');
+  if (qIdx === -1) return { baseUrl: url, params: [] };
+  const baseUrl = url.slice(0, qIdx);
+  const queryString = url.slice(qIdx + 1);
+  const params = queryString.split('&').map((pair) => {
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) return { key: pair, value: '' };
+    return { key: pair.slice(0, eqIdx), value: pair.slice(eqIdx + 1) };
+  }).filter((p) => p.key !== '');
+  return { baseUrl, params };
+}
+
+function buildUrlWithParams(baseUrl: string, params: { key: string; value: string }[]): string {
+  const active = params.filter((p) => p.key.trim() !== '');
+  if (active.length === 0) return baseUrl;
+  const qs = active.map((p) => (p.value ? `${p.key}=${p.value}` : p.key)).join('&');
+  return `${baseUrl}?${qs}`;
+}
 const ASSERTION_TYPES = [
   { value: 'status', label: 'HTTP Status' },
   { value: 'json_path', label: 'JSON Path' },
@@ -87,27 +108,32 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
   const bodyEditorRef = useRef<JsonEditorRef>(null);
 
   const [categories, setCategories] = useState<Category[]>([]);
+  const [queryParams, setQueryParams] = useState<{ key: string; value: string }[]>([]);
 
   useEffect(() => {
     if (testId) {
-      api.getTest(testId).then((t) => {
+      api.getTest(testId).then(async (t) => {
         const headers = (t.headers as Record<string, string>) || {};
+        const { baseUrl, params } = parseQueryParams(t.url);
         setForm({
           projectId: t.projectId ?? projectId ?? 0,
           categoryId: t.categoryId ?? null,
           name: t.name,
           method: t.method || 'GET',
-          url: t.url,
+          url: baseUrl,
           headers,
           body: t.body || '',
           assertions: t.assertions?.length ? t.assertions : [{ ...emptyAssertion }],
         });
         setHeadersJson(JSON.stringify(headers, null, 2));
-        setLoading(false);
+        setQueryParams(params);
         if (t.projectId) {
-          api.listEnvVars(t.projectId).then(setEnvVars).catch(() => { });
-          api.listCategories(t.projectId).then(setCategories).catch(() => { });
+          await Promise.all([
+            api.listEnvVars(t.projectId).then(setEnvVars).catch(() => {}),
+            api.listCategories(t.projectId).then(setCategories).catch(() => {}),
+          ]);
         }
+        setLoading(false);
       }).catch((e) => {
         setError(e.message);
         setLoading(false);
@@ -115,8 +141,8 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
     } else {
       if (projectId) {
         setForm((f) => ({ ...f, projectId }));
-        api.listEnvVars(projectId).then(setEnvVars).catch(() => { });
-        api.listCategories(projectId).then(setCategories).catch(() => { });
+        api.listEnvVars(projectId).then(setEnvVars).catch(() => {});
+        api.listCategories(projectId).then(setCategories).catch(() => {});
       }
     }
   }, [testId, projectId]);
@@ -170,6 +196,7 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
       }
       const payload = {
         ...form,
+        url: buildUrlWithParams(form.url, queryParams),
         headers,
         assertions: form.assertions.map((a) => ({
           type: a.type,
@@ -263,7 +290,11 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
               <FormLabel>HTTP Method</FormLabel>
               <Select
                 value={form.method}
-                onChange={(_, v) => update('method', v)}
+                onChange={(_, v) => {
+                  const m = v as string;
+                  update('method', m);
+                  if (BODYLESS_METHODS.has(m)) update('body', '');
+                }}
               >
                 {METHOD_OPTIONS.map((m) => (
                   <Option key={m} value={m}>{m}</Option>
@@ -279,6 +310,46 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                 required
               />
             </FormControl>
+          </Box>
+
+          {/* Query Params Table */}
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Typography level="body-sm" fontWeight={600}>Query Params</Typography>
+              <Button
+                size="sm"
+                variant="outlined"
+                startDecorator={<AddIcon />}
+                onClick={() => setQueryParams((p) => [...p, { key: '', value: '' }])}
+              >
+                Add Param
+              </Button>
+            </Box>
+            {queryParams.length > 0 && (
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {queryParams.map((param, i) => (
+                  <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                    <Input
+                      size="sm"
+                      placeholder="Key"
+                      value={param.key}
+                      onChange={(e) => setQueryParams((ps) => ps.map((p, idx) => idx === i ? { ...p, key: e.target.value } : p))}
+                      sx={{ flex: 1 }}
+                    />
+                    <Input
+                      size="sm"
+                      placeholder="Value"
+                      value={param.value}
+                      onChange={(e) => setQueryParams((ps) => ps.map((p, idx) => idx === i ? { ...p, value: e.target.value } : p))}
+                      sx={{ flex: 2 }}
+                    />
+                    <IconButton size="sm" variant="plain" color="danger" onClick={() => setQueryParams((ps) => ps.filter((_, idx) => idx !== i))}>
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
           </Box>
         </Stack>
       </Sheet>

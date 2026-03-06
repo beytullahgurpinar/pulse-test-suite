@@ -6,10 +6,22 @@ import type {
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
 
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...options?.headers
+    },
   });
+  if (res.status === 401) {
+    const errData = await res.json().catch(() => ({}));
+    console.error('Auth check failed:', path, errData.error || 'Unauthorized');
+    localStorage.removeItem('token');
+    window.location.href = '/login';
+    throw new Error('Unauthorized');
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err.error || res.statusText);
@@ -67,8 +79,8 @@ export const api = {
       `/tests/run-all${projectId ? `?projectId=${projectId}` : ''}`,
       { method: 'POST' }
     ),
-  listRuns: (testId?: number, page: number = 1, limit: number = 20) =>
-    fetchApi<PaginatedResponse<TestRun>>(`/runs?page=${page}&limit=${limit}${testId ? `&testId=${testId}` : ''}`),
+  listRuns: (testId?: number, page: number = 1, limit: number = 20, projectId?: number) =>
+    fetchApi<PaginatedResponse<TestRun>>(`/runs?page=${page}&limit=${limit}${testId ? `&testId=${testId}` : ''}${projectId ? `&projectId=${projectId}` : ''}`),
   getRun: (id: number) =>
     fetchApi<RunResult & { createdAt?: string }>(`/runs/${id}`),
 
@@ -104,4 +116,23 @@ export const api = {
     fetchApi<PaginatedResponse<FlowRun>>(`/flows/runs?page=${page}&limit=${limit}${flowId ? `&flowId=${flowId}` : ''}`),
   getFlowRun: (id: number) =>
     fetchApi<FlowRun>(`/flows/runs/${id}`),
+
+  // Auth
+  getMe: () => fetchApi<{ id: number; email: string; name: string; avatar: string; role: string; lastProjectId?: number | null; workspace: any }>('/auth/me'),
+  updateLastProject: (projectId: number) =>
+    fetchApi<{ message: string }>('/auth/me/last-project', { method: 'POST', body: JSON.stringify({ projectId }) }),
+
+  // User management (admin only)
+  listUsers: () => fetchApi<Array<{ id: number; email: string; name: string; avatar: string; role: string; isSelf: boolean; createdAt: string }>>('/users'),
+  updateUser: (id: number, data: { role: string }) =>
+    fetchApi<{ message: string }>(`/users/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteUser: (id: number) =>
+    fetchApi<{ message: string }>(`/users/${id}`, { method: 'DELETE' }),
+
+  // Invitations (admin only)
+  listInvitations: () => fetchApi<Array<{ id: number; email: string; role: string; token: string; used: boolean; createdAt: string }>>('/invitations'),
+  createInvitation: (data: { email: string; role: string }) =>
+    fetchApi<{ id: number; email: string; role: string; token: string; createdAt: string }>('/invitations', { method: 'POST', body: JSON.stringify(data) }),
+  deleteInvitation: (id: number) =>
+    fetchApi<{ message: string }>(`/invitations/${id}`, { method: 'DELETE' }),
 };

@@ -28,6 +28,8 @@ func main() {
 	}
 
 	h := handlers.New(db, cfg.EncryptionKey)
+	auth := handlers.NewAuthHandler(db, cfg)
+	users := handlers.NewUserHandler(db)
 
 	// Start the scheduler
 	sched := scheduler.New(db, cfg.EncryptionKey)
@@ -37,56 +39,101 @@ func main() {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
 
+	// Security headers
+	r.Use(func(c *gin.Context) {
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("X-XSS-Protection", "1; mode=block")
+		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
+		c.Next()
+	})
+
 	// API
-	api := r.Group("/api")
+	apiGroup := r.Group("/api")
 	{
-		api.GET("/projects", h.ListProjects)
-		api.POST("/projects", h.CreateProject)
-		api.PUT("/projects/:id", h.UpdateProject)
-		api.DELETE("/projects/:id", h.DeleteProject)
+		// Auth - No middleware
+		apiGroup.GET("/auth/google/login", auth.GoogleLogin)
+		apiGroup.GET("/auth/google/callback", auth.GoogleCallback)
 
-		api.GET("/env-vars", h.ListEnvVars)
-		api.GET("/env-vars/:id", h.GetEnvVar)
-		api.POST("/env-vars", h.CreateEnvVar)
-		api.PUT("/env-vars/:id", h.UpdateEnvVar)
-		api.DELETE("/env-vars/:id", h.DeleteEnvVar)
+		// Protected API
+		protected := apiGroup.Group("")
+		protected.Use(handlers.AuthMiddleware(cfg.JWTSecret))
+		{
+			protected.GET("/auth/me", auth.GetMe)
+			protected.POST("/auth/me/last-project", auth.UpdateLastProject)
 
-		api.GET("/tests", h.ListTestRequests)
-		api.POST("/tests", h.CreateTestRequest)
-		api.GET("/tests/:id", h.GetTestRequest)
-		api.PUT("/tests/:id", h.UpdateTestRequest)
-		api.DELETE("/tests/:id", h.DeleteTestRequest)
-		api.POST("/tests/:id/duplicate", h.DuplicateTestRequest)
-		api.POST("/tests/:id/run", h.RunTest)
-		api.POST("/tests/run-all", h.RunAllTests)
-		api.GET("/runs/:id", h.GetTestRun)
-		api.GET("/runs", h.ListTestRuns)
+			// Projects management - Admin only
+			projects := protected.Group("/projects")
+			projects.Use(handlers.AdminOnly())
+			{
+				projects.POST("", h.CreateProject)
+				projects.PUT("/:id", h.UpdateProject)
+				projects.DELETE("/:id", h.DeleteProject)
+			}
+			// Projects list - All roles
+			protected.GET("/projects", h.ListProjects)
 
-		// Categories
-		api.GET("/categories", h.ListCategories)
-		api.POST("/categories", h.CreateCategory)
-		api.PUT("/categories/:id", h.UpdateCategory)
-		api.DELETE("/categories/:id", h.DeleteCategory)
+			protected.GET("/env-vars", h.ListEnvVars)
+			protected.GET("/env-vars/:id", h.GetEnvVar)
+			protected.POST("/env-vars", h.CreateEnvVar)
+			protected.PUT("/env-vars/:id", h.UpdateEnvVar)
+			protected.DELETE("/env-vars/:id", h.DeleteEnvVar)
 
-		// Flows
-		api.GET("/flows", h.ListFlows)
-		api.GET("/flows/runs", h.ListFlowRuns)
-		api.GET("/flows/runs/:id", h.GetFlowRun)
-		api.GET("/flows/:id", h.GetFlow)
-		api.POST("/flows", h.CreateFlow)
-		api.PUT("/flows/:id", h.UpdateFlow)
-		api.DELETE("/flows/:id", h.DeleteFlow)
-		api.POST("/flows/:id/run", h.RunFlow)
+			protected.GET("/tests", h.ListTestRequests)
+			protected.POST("/tests", h.CreateTestRequest)
+			protected.GET("/tests/:id", h.GetTestRequest)
+			protected.PUT("/tests/:id", h.UpdateTestRequest)
+			protected.DELETE("/tests/:id", h.DeleteTestRequest)
+			protected.POST("/tests/:id/duplicate", h.DuplicateTestRequest)
+			protected.POST("/tests/:id/run", h.RunTest)
+			protected.POST("/tests/run-all", h.RunAllTests)
+			protected.GET("/runs/:id", h.GetTestRun)
+			protected.GET("/runs", h.ListTestRuns)
 
-		// Dashboard
-		api.GET("/dashboard", h.GetDashboard)
+			// Categories
+			protected.GET("/categories", h.ListCategories)
+			protected.POST("/categories", h.CreateCategory)
+			protected.PUT("/categories/:id", h.UpdateCategory)
+			protected.DELETE("/categories/:id", h.DeleteCategory)
 
-		// Schedules
-		api.GET("/schedules", h.ListSchedules)
-		api.POST("/schedules", h.CreateSchedule)
-		api.PUT("/schedules/:id", h.UpdateSchedule)
-		api.DELETE("/schedules/:id", h.DeleteSchedule)
-		api.POST("/schedules/:id/toggle", h.ToggleSchedule)
+			// Flows
+			protected.GET("/flows", h.ListFlows)
+			protected.GET("/flows/runs", h.ListFlowRuns)
+			protected.GET("/flows/runs/:id", h.GetFlowRun)
+			protected.GET("/flows/:id", h.GetFlow)
+			protected.POST("/flows", h.CreateFlow)
+			protected.PUT("/flows/:id", h.UpdateFlow)
+			protected.DELETE("/flows/:id", h.DeleteFlow)
+			protected.POST("/flows/:id/run", h.RunFlow)
+
+			// User management - Admin only
+			userGroup := protected.Group("/users")
+			userGroup.Use(handlers.AdminOnly())
+			{
+				userGroup.GET("", users.ListUsers)
+				userGroup.PUT("/:id", users.UpdateUser)
+				userGroup.DELETE("/:id", users.DeleteUser)
+			}
+
+			// Invitations - Admin only
+			invGroup := protected.Group("/invitations")
+			invGroup.Use(handlers.AdminOnly())
+			{
+				invGroup.GET("", users.ListInvitations)
+				invGroup.POST("", users.CreateInvitation)
+				invGroup.DELETE("/:id", users.DeleteInvitation)
+			}
+
+			// Dashboard
+			protected.GET("/dashboard", h.GetDashboard)
+
+			// Schedules
+			protected.GET("/schedules", h.ListSchedules)
+			protected.POST("/schedules", h.CreateSchedule)
+			protected.PUT("/schedules/:id", h.UpdateSchedule)
+			protected.DELETE("/schedules/:id", h.DeleteSchedule)
+			protected.POST("/schedules/:id/toggle", h.ToggleSchedule)
+		}
 	}
 
 	// Static frontend - serve directly with c.Data (no redirects)

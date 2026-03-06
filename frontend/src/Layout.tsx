@@ -21,6 +21,9 @@ import VpnKeyRoundedIcon from '@mui/icons-material/VpnKeyRounded';
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
+import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import type { Project } from './types';
 import { api } from './api';
 import { ColorSchemeToggle } from './components/ColorSchemeToggle';
@@ -29,7 +32,10 @@ const SIDEBAR_WIDTH = 260;
 
 export function Layout() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [user, setUser] = useState<any>(null);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  // Tracks the last explicitly selected project so sidebar stays populated on global pages
+  const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -39,7 +45,20 @@ export function Layout() {
 
   useEffect(() => {
     loadProjects();
+    api.getMe().then((u) => {
+      setUser(u);
+      if (u.lastProjectId) setActiveProjectId(u.lastProjectId);
+    }).catch((err) => {
+      // 401 Unauthorized is already handled globally by fetchApi (removes token + redirect)
+      // Do not log out the user for transient errors (network, 5xx, etc.)
+      console.error('Failed to load user profile:', err);
+    });
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
 
   const projectIdFromPath = (): number | null => {
     const m = location.pathname.match(/^\/p\/(\d+)/);
@@ -48,30 +67,40 @@ export function Layout() {
 
   const currentProjectId = projectIdFromPath();
 
-  // If we have projects but no current project selected in path (and we are not on global pages), 
-  // we might want to default to the first project? 
-  // Actually, let's just use the currentProjectId if available.
+  // When URL carries a project ID, keep activeProjectId in sync
+  useEffect(() => {
+    if (currentProjectId) setActiveProjectId(currentProjectId);
+  }, [currentProjectId]);
+
+  // sidebarProjectId: prefer URL project (for accurate active-highlight), fall back to last selected
+  const sidebarProjectId = currentProjectId ?? activeProjectId;
 
   const handleSelectProject = (id: number | null) => {
     if (!id) return;
-    // Current behavior: if we change project, we stay on the same "tab" if possible
+    setActiveProjectId(id);
+    api.updateLastProject(id).catch(console.error); // fire-and-forget persistence
+    // Stay on the same tab if we're already inside a project page
     const parts = location.pathname.split('/');
     if (parts.length >= 4 && parts[1] === 'p') {
-      const tab = parts[3]; // tests, flows, env
+      const tab = parts[3]; // tests, flows, env, schedules
       navigate(`/p/${id}/${tab}`);
     } else {
       navigate(`/p/${id}/tests`);
     }
   };
 
+  const isAdmin = user?.role === 'admin';
+
   const navItems = [
-    { label: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/dashboard', global: true },
-    { label: 'Tests', icon: <ScienceRoundedIcon />, path: '/p/:id/tests', global: false },
-    { label: 'Flows', icon: <AccountTreeRoundedIcon />, path: '/p/:id/flows', global: false },
-    { label: 'Schedules', icon: <ScheduleRoundedIcon />, path: '/p/:id/schedules', global: false },
-    { label: 'Environment', icon: <VpnKeyRoundedIcon />, path: '/p/:id/env', global: false },
-    { label: 'Manage Projects', icon: <SettingsRoundedIcon />, path: '/projects', global: true },
-  ];
+    { label: 'Dashboard', icon: <DashboardRoundedIcon />, path: '/dashboard', global: true, adminOnly: false },
+    { label: 'Tests', icon: <ScienceRoundedIcon />, path: '/p/:id/tests', global: false, adminOnly: false },
+    { label: 'Flows', icon: <AccountTreeRoundedIcon />, path: '/p/:id/flows', global: false, adminOnly: false },
+    { label: 'Results', icon: <AssessmentRoundedIcon />, path: '/p/:id/results', global: false, adminOnly: false },
+    { label: 'Schedules', icon: <ScheduleRoundedIcon />, path: '/p/:id/schedules', global: false, adminOnly: false },
+    { label: 'Environment', icon: <VpnKeyRoundedIcon />, path: '/p/:id/env', global: false, adminOnly: false },
+    { label: 'Manage Projects', icon: <SettingsRoundedIcon />, path: '/projects', global: true, adminOnly: true },
+    { label: 'Users', icon: <GroupRoundedIcon />, path: '/users', global: true, adminOnly: true },
+  ].filter(item => !item.adminOnly || isAdmin);
 
   const sidebarContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden', p: 2 }}>
@@ -81,7 +110,7 @@ export function Layout() {
           Active Project
         </Typography>
         <Select
-          value={currentProjectId}
+          value={sidebarProjectId}
           placeholder="Select Project"
           onChange={(_, val) => handleSelectProject(val)}
           startDecorator={<FolderRoundedIcon sx={{ color: 'primary.500' }} />}
@@ -111,9 +140,9 @@ export function Layout() {
       >
         {navItems.map((item) => {
           const isGlobal = item.global;
-          const activePath = isGlobal ? item.path : item.path.replace(':id', String(currentProjectId || ''));
+          const activePath = isGlobal ? item.path : item.path.replace(':id', String(sidebarProjectId || ''));
           const isActive = location.pathname.startsWith(activePath) && (isGlobal || currentProjectId !== null);
-          const isDisabled = !isGlobal && !currentProjectId;
+          const isDisabled = !isGlobal && !sidebarProjectId;
 
           return (
             <ListItemButton
@@ -148,14 +177,40 @@ export function Layout() {
       </List>
 
       {/* Footer Info */}
-      <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', mt: 'auto', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Box sx={{ width: 32, height: 32, borderRadius: '8px', bgcolor: 'primary.500', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800 }}>D</Typography>
+      <Box sx={{ pt: 2, borderTop: '1px solid', borderColor: 'divider', mt: 'auto' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+          <Box sx={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            bgcolor: 'primary.500',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+            overflow: 'hidden'
+          }}>
+            {user?.avatar ? (
+              <img src={user.avatar} alt={user.name} style={{ width: '100%', height: '100%' }} />
+            ) : (
+              <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 800 }}>
+                {user?.name?.[0] || user?.email?.[0] || 'U'}
+              </Typography>
+            )}
+          </Box>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography level="body-xs" fontWeight={700} noWrap>{user?.name || user?.email}</Typography>
+            <Typography level="body-xs" textColor="neutral.500" noWrap>
+              {user?.role === 'admin' ? 'Admin' : 'Editor'} • {user?.workspace?.name}
+            </Typography>
+          </Box>
+          <IconButton size="sm" variant="plain" color="neutral" onClick={handleLogout}>
+            <LogoutRoundedIcon />
+          </IconButton>
         </Box>
-        <Box sx={{ minWidth: 0 }}>
-          <Typography level="body-xs" fontWeight={700}>Pulse Test Suite</Typography>
-          <Typography level="body-xs" textColor="neutral.500">v1.3.0 • Premium</Typography>
-        </Box>
+        <Typography level="body-xs" textAlign="center" sx={{ opacity: 0.5 }}>
+          Pulse Suite v1.3.0
+        </Typography>
       </Box>
     </Box>
   );

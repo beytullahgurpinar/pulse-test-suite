@@ -91,6 +91,9 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 		status = "failed"
 	}
 
+	var p models.Project
+	s.DB.Select("workspace_id").First(&p, test.ProjectID)
+
 	testRun := models.TestRun{
 		TestRequestID:    test.ID,
 		Status:           status,
@@ -104,6 +107,7 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 		RequestHeaders:   string(headersJSON),
 		RequestBody:      maskedBody,
 		ScheduleID:       scheduleID,
+		WorkspaceID:      p.WorkspaceID,
 	}
 	if err := s.DB.Create(&testRun).Error; err != nil {
 		return nil, err
@@ -115,7 +119,7 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 // ExecuteAndSaveFlow runs a flow and saves results
 func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint) (*models.FlowRun, error) {
 	var flow models.Flow
-	if err := s.DB.Preload("Steps", func(db *gorm.DB) *gorm.DB {
+	if err := s.DB.Preload("Project").Preload("Steps", func(db *gorm.DB) *gorm.DB {
 		return db.Order("order_num ASC")
 	}).First(&flow, flowID).Error; err != nil {
 		return nil, err
@@ -124,9 +128,10 @@ func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint) (*m
 	envMap, securedNames := s.LoadEnvMap(flow.ProjectID)
 
 	flowRun := models.FlowRun{
-		FlowID:     flow.ID,
-		Status:     "running",
-		ScheduleID: scheduleID,
+		FlowID:      flow.ID,
+		Status:      "running",
+		ScheduleID:  scheduleID,
+		WorkspaceID: flow.Project.WorkspaceID,
 	}
 	if err := s.DB.Create(&flowRun).Error; err != nil {
 		return nil, err
@@ -171,6 +176,7 @@ func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint) (*m
 			RequestHeaders:   string(headersJSON),
 			RequestBody:      maskedBody,
 			ScheduleID:       scheduleID,
+			WorkspaceID:      flow.Project.WorkspaceID,
 		}
 		s.DB.Create(&testRun)
 

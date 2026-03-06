@@ -29,12 +29,47 @@ func (j *JSONMap) Scan(value interface{}) error {
 	return json.Unmarshal(bytes, j)
 }
 
-// Project - Test grupları
-type Project struct {
+// Workspace - Multi-tenant isolation
+type Workspace struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	Name      string    `json:"name" gorm:"size:255;not null"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// User - Platform users
+type User struct {
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	WorkspaceID   uint      `json:"workspaceId" gorm:"not null;index"`
+	GoogleID      string    `json:"googleId" gorm:"size:255;uniqueIndex"`
+	Email         string    `json:"email" gorm:"size:255;uniqueIndex;not null"`
+	Name          string    `json:"name" gorm:"size:255"`
+	Avatar        string    `json:"avatar" gorm:"size:255"`
+	Role          string    `json:"role" gorm:"size:20;default:editor"` // admin, editor
+	LastProjectID *uint     `json:"lastProjectId" gorm:"default:null"`  // last selected project
+	Workspace     Workspace `json:"workspace" gorm:"foreignKey:WorkspaceID"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+// Invitation - Workspace davetiyesi
+type Invitation struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	WorkspaceID uint      `json:"workspaceId" gorm:"not null;index"`
+	Email       string    `json:"email" gorm:"size:255;not null"`
+	Role        string    `json:"role" gorm:"size:20;default:editor"` // admin, editor
+	Token       string    `json:"token" gorm:"size:64;uniqueIndex;not null"`
+	Used        bool      `json:"used" gorm:"default:false"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// Project - Test grupları
+type Project struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	WorkspaceID uint      `json:"workspaceId" gorm:"not null;index"`
+	Name        string    `json:"name" gorm:"size:255;not null"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // Category - Test kategorileri (klasörler)
@@ -100,6 +135,8 @@ type TestRun struct {
 	RequestURL     string `json:"requestUrl" gorm:"type:text"`
 	RequestHeaders string `json:"requestHeaders" gorm:"type:json"`
 	RequestBody    string `json:"requestBody" gorm:"type:longtext"`
+	// Multi-tenancy
+	WorkspaceID uint `json:"workspaceId" gorm:"not null;index"`
 	// Schedule tracking
 	ScheduleID *uint     `json:"scheduleId,omitempty" gorm:"default:null"`
 	CreatedAt  time.Time `json:"createdAt"`
@@ -128,6 +165,7 @@ type Schedule struct {
 type Flow struct {
 	ID        uint       `json:"id" gorm:"primaryKey"`
 	ProjectID uint       `json:"projectId" gorm:"not null"`
+	Project   Project    `json:"project" gorm:"foreignKey:ProjectID"`
 	Name      string     `json:"name" gorm:"size:255;not null"`
 	CreatedAt time.Time  `json:"createdAt"`
 	UpdatedAt time.Time  `json:"updatedAt"`
@@ -148,13 +186,15 @@ type FlowStep struct {
 
 // FlowRun - Akışın çalışma geçmişi / ana raporu
 type FlowRun struct {
-	ID         uint          `json:"id" gorm:"primaryKey"`
-	FlowID     uint          `json:"flowId" gorm:"not null;constraint:OnDelete:CASCADE"`
-	Status     string        `json:"status" gorm:"size:20"` // passed, failed, partial
-	DurationMs int64         `json:"durationMs"`
-	ScheduleID *uint         `json:"scheduleId,omitempty" gorm:"default:null"`
-	CreatedAt  time.Time     `json:"createdAt"`
-	Steps      []FlowRunStep `json:"steps" gorm:"foreignKey:FlowRunID;constraint:OnDelete:CASCADE"`
+	ID         uint   `json:"id" gorm:"primaryKey"`
+	FlowID     uint   `json:"flowId" gorm:"not null;constraint:OnDelete:CASCADE"`
+	Status     string `json:"status" gorm:"size:20"` // passed, failed, partial
+	DurationMs int64  `json:"durationMs"`
+	ScheduleID *uint  `json:"scheduleId,omitempty" gorm:"default:null"`
+	// Multi-tenancy
+	WorkspaceID uint          `json:"workspaceId" gorm:"not null;index"`
+	CreatedAt   time.Time     `json:"createdAt"`
+	Steps       []FlowRunStep `json:"steps" gorm:"foreignKey:FlowRunID;constraint:OnDelete:CASCADE"`
 }
 
 // FlowRunStep - Akış raporunun altındaki her bir adımı/detayı

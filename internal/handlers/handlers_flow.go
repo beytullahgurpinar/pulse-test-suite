@@ -13,13 +13,24 @@ import (
 // --- Flows ---
 
 func (h *Handler) ListFlows(c *gin.Context) {
-	projectID := c.Query("projectId")
-	if projectID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "projectId required"})
-		return
-	}
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	var list []models.Flow
-	if err := h.DB.Preload("Steps").Where("project_id = ?", projectID).Find(&list).Error; err != nil {
+	q := h.DB.Preload("Steps").Order("created_at DESC")
+
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Where("project_id = ?", pid)
+	} else {
+		q = q.Joins("JOIN projects ON projects.id = flows.project_id").Where("projects.workspace_id = ?", wsID)
+	}
+
+	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -30,6 +41,10 @@ func (h *Handler) GetFlow(c *gin.Context) {
 	var flow models.Flow
 	if err := h.DB.Preload("Steps").First(&flow, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, flow.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	c.JSON(http.StatusOK, flow)
@@ -43,6 +58,10 @@ func (h *Handler) CreateFlow(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -64,6 +83,10 @@ func (h *Handler) UpdateFlow(c *gin.Context) {
 	var flow models.Flow
 	if err := h.DB.First(&flow, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, flow.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	var body struct {
@@ -102,18 +125,19 @@ func (h *Handler) UpdateFlow(c *gin.Context) {
 }
 
 func (h *Handler) DeleteFlow(c *gin.Context) {
-	id := c.Param("id")
+	var flow models.Flow
+	if err := h.DB.First(&flow, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, flow.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("flow_id = ?", id).Delete(&models.FlowStep{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("flow_id = ?", id).Delete(&models.FlowRun{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(&models.Flow{}, id).Error; err != nil {
-			return err
-		}
-		return nil
+		tx.Where("flow_id = ?", flow.ID).Delete(&models.FlowStep{})
+		tx.Where("flow_id = ?", flow.ID).Delete(&models.FlowRun{})
+		return tx.Delete(&flow).Error
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -124,6 +148,16 @@ func (h *Handler) DeleteFlow(c *gin.Context) {
 
 func (h *Handler) RunFlow(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
+	// Check access
+	var flow models.Flow
+	if err := h.DB.First(&flow, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, flow.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	run, err := h.execution.ExecuteAndSaveFlow(uint(id), nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -136,6 +170,9 @@ func (h *Handler) RunFlow(c *gin.Context) {
 
 func (h *Handler) ListFlowRuns(c *gin.Context) {
 	flowID := c.Query("flowId")
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
 	if page < 1 {
@@ -148,12 +185,18 @@ func (h *Handler) ListFlowRuns(c *gin.Context) {
 
 	var runs []models.FlowRun
 	q := h.DB.Model(&models.FlowRun{}).Order("created_at DESC")
+	q = q.Where("workspace_id = ?", wsID)
+
 	if flowID != "" {
-		if fid, err := strconv.Atoi(flowID); err == nil {
-			q = q.Where("flow_id = ?", fid)
-		} else {
-			q = q.Where("flow_id = ?", flowID)
+		q = q.Where("flow_id = ?", flowID)
+	}
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
 		}
+		q = q.Joins("JOIN flows ON flows.id = flow_runs.flow_id").Where("flows.project_id = ?", pid)
 	}
 
 	var total int64
@@ -176,6 +219,11 @@ func (h *Handler) GetFlowRun(c *gin.Context) {
 	var run models.FlowRun
 	if err := h.DB.Preload("Steps.TestRun").First(&run, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	wsID := h.getWorkspaceID(c)
+	if run.WorkspaceID != wsID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	c.JSON(http.StatusOK, run)

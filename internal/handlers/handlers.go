@@ -29,10 +29,26 @@ func New(db *gorm.DB, encryptionKey string) *Handler {
 	}
 }
 
+func (h *Handler) getWorkspaceID(c *gin.Context) uint {
+	wsID, _ := c.Get("workspaceID")
+	if id, ok := wsID.(uint); ok {
+		return id
+	}
+	return 0
+}
+
+func (h *Handler) hasProject(c *gin.Context, projectID uint) bool {
+	wsID := h.getWorkspaceID(c)
+	var count int64
+	h.DB.Model(&models.Project{}).Where("id = ? AND workspace_id = ?", projectID, wsID).Count(&count)
+	return count > 0
+}
+
 // --- Projects ---
 func (h *Handler) ListProjects(c *gin.Context) {
+	wsID := h.getWorkspaceID(c)
 	var list []models.Project
-	if err := h.DB.Find(&list).Error; err != nil {
+	if err := h.DB.Where("workspace_id = ?", wsID).Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -47,7 +63,8 @@ func (h *Handler) CreateProject(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	p := models.Project{Name: req.Name}
+	wsID := h.getWorkspaceID(c)
+	p := models.Project{Name: req.Name, WorkspaceID: wsID}
 	if err := h.DB.Create(&p).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -56,9 +73,10 @@ func (h *Handler) CreateProject(c *gin.Context) {
 }
 
 func (h *Handler) UpdateProject(c *gin.Context) {
+	wsID := h.getWorkspaceID(c)
 	var p models.Project
-	if err := h.DB.First(&p, c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+	if err := h.DB.Where("id = ? AND workspace_id = ?", c.Param("id"), wsID).First(&p).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
 		return
 	}
 	var body struct {
@@ -75,6 +93,16 @@ func (h *Handler) UpdateProject(c *gin.Context) {
 
 func (h *Handler) DeleteProject(c *gin.Context) {
 	id := c.Param("id")
+	wsID := h.getWorkspaceID(c)
+
+	// Check ownership before delete
+	var count int64
+	h.DB.Model(&models.Project{}).Where("id = ? AND workspace_id = ?", id, wsID).Count(&count)
+	if count == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Project not found"})
+		return
+	}
+
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
 		tx.Where("project_id = ?", id).Delete(&models.EnvVar{})
 		// Delete schedules for project
@@ -86,7 +114,7 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 			tx.Where("test_request_id = ?", t.ID).Delete(&models.TestRun{})
 		}
 		tx.Where("project_id = ?", id).Delete(&models.TestRequest{})
-		return tx.Delete(&models.Project{}, id).Error
+		return tx.Where("id = ? AND workspace_id = ?", id, wsID).Delete(&models.Project{}).Error
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -97,13 +125,19 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 
 // --- Env Vars ---
 func (h *Handler) ListEnvVars(c *gin.Context) {
-	projectID := c.Query("projectId")
-	if projectID == "" {
+	projectIDStr := c.Query("projectId")
+	if projectIDStr == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "projectId required"})
 		return
 	}
+	pid, _ := strconv.Atoi(projectIDStr)
+	if !h.hasProject(c, uint(pid)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+
 	var list []models.EnvVar
-	if err := h.DB.Where("project_id = ?", projectID).Find(&list).Error; err != nil {
+	if err := h.DB.Where("project_id = ?", pid).Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -126,11 +160,12 @@ func (h *Handler) GetEnvVar(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
-	if ev.Secured && ev.Value != "" {
-		dec, err := crypto.Decrypt(ev.Value, h.EncryptionKey)
-		if err == nil {
-			ev.Value = dec
-		}
+	if !h.hasProject(c, ev.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+	if ev.Secured {
+		ev.Value = "secret:****"
 	}
 	c.JSON(http.StatusOK, ev)
 }
@@ -143,7 +178,11 @@ func (h *Handler) CreateEnvVar(c *gin.Context) {
 		Secured   bool   `json:"secured"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	value := req.Value
@@ -172,6 +211,10 @@ func (h *Handler) UpdateEnvVar(c *gin.Context) {
 	var ev models.EnvVar
 	if err := h.DB.First(&ev, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, ev.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	var body struct {
@@ -220,11 +263,17 @@ func (h *Handler) UpdateEnvVar(c *gin.Context) {
 }
 
 func (h *Handler) DeleteEnvVar(c *gin.Context) {
-	if err := h.DB.Delete(&models.EnvVar{}, c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	var ev models.EnvVar
+	if err := h.DB.First(&ev, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
+	if !h.hasProject(c, ev.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+	h.DB.Delete(&ev)
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
 
 // --- Tests ---
@@ -242,6 +291,11 @@ func (h *Handler) CreateTestRequest(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -272,12 +326,24 @@ func (h *Handler) CreateTestRequest(c *gin.Context) {
 
 // ListTestRequests - Test isteklerini listele (projectId ile filtre)
 func (h *Handler) ListTestRequests(c *gin.Context) {
-	projectID := c.Query("projectId")
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	var list []models.TestRequest
 	q := h.DB.Preload("Assertions")
-	if projectID != "" {
-		q = q.Where("project_id = ?", projectID)
+
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Where("project_id = ?", pid)
+	} else {
+		// Only from accessible projects
+		q = q.Joins("JOIN projects ON projects.id = test_requests.project_id").Where("projects.workspace_id = ?", wsID)
 	}
+
 	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -292,6 +358,10 @@ func (h *Handler) GetTestRequest(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	c.JSON(http.StatusOK, req)
 }
 
@@ -300,6 +370,11 @@ func (h *Handler) UpdateTestRequest(c *gin.Context) {
 	var req models.TestRequest
 	if err := h.DB.First(&req, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
@@ -315,6 +390,10 @@ func (h *Handler) UpdateTestRequest(c *gin.Context) {
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.ProjectID > 0 && !h.hasProject(c, body.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden project move"})
 		return
 	}
 
@@ -354,18 +433,19 @@ func (h *Handler) UpdateTestRequest(c *gin.Context) {
 
 // DeleteTestRequest - Test isteğini sil (önce child kayıtları sil)
 func (h *Handler) DeleteTestRequest(c *gin.Context) {
-	id := c.Param("id")
+	var req models.TestRequest
+	if err := h.DB.First(&req, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("test_request_id = ?", id).Delete(&models.Assertion{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("test_request_id = ?", id).Delete(&models.TestRun{}).Error; err != nil {
-			return err
-		}
-		if err := tx.Delete(&models.TestRequest{}, id).Error; err != nil {
-			return err
-		}
-		return nil
+		tx.Where("test_request_id = ?", req.ID).Delete(&models.Assertion{})
+		tx.Where("test_request_id = ?", req.ID).Delete(&models.TestRun{})
+		return tx.Delete(&req).Error
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -376,26 +456,30 @@ func (h *Handler) DeleteTestRequest(c *gin.Context) {
 
 // DuplicateTestRequest - Testi kopyala
 func (h *Handler) DuplicateTestRequest(c *gin.Context) {
-	var orig models.TestRequest
-	if err := h.DB.Preload("Assertions").First(&orig, c.Param("id")).Error; err != nil {
+	var source models.TestRequest
+	if err := h.DB.Preload("Assertions").First(&source, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, source.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 
 	dup := models.TestRequest{
-		ProjectID:  orig.ProjectID,
-		CategoryID: orig.CategoryID,
-		Name:       "Kopya: " + orig.Name,
-		Method:     orig.Method,
-		URL:        orig.URL,
-		Headers:    orig.Headers,
-		Body:       orig.Body,
+		ProjectID:  source.ProjectID,
+		CategoryID: source.CategoryID,
+		Name:       "Kopya: " + source.Name,
+		Method:     source.Method,
+		URL:        source.URL,
+		Headers:    source.Headers,
+		Body:       source.Body,
 	}
 	if err := h.DB.Create(&dup).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	for _, a := range orig.Assertions {
+	for _, a := range source.Assertions {
 		newA := models.Assertion{
 			TestRequestID: dup.ID,
 			Type:          a.Type,
@@ -411,13 +495,17 @@ func (h *Handler) DuplicateTestRequest(c *gin.Context) {
 
 // RunTest - Tek test çalıştır
 func (h *Handler) RunTest(c *gin.Context) {
-	var req models.TestRequest
-	if err := h.DB.Preload("Assertions").First(&req, c.Param("id")).Error; err != nil {
+	var testReq models.TestRequest
+	if err := h.DB.Preload("Assertions").First(&testReq, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	if !h.hasProject(c, testReq.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 
-	testRun, err := h.execution.ExecuteAndSaveTest(&req, nil)
+	testRun, err := h.execution.ExecuteAndSaveTest(&testReq, nil)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -455,12 +543,23 @@ func (h *Handler) RunTest(c *gin.Context) {
 
 // RunAllTests - Tüm testleri çalıştır (projectId ile filtre)
 func (h *Handler) RunAllTests(c *gin.Context) {
-	projectID := c.Query("projectId")
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	var list []models.TestRequest
 	q := h.DB.Preload("Assertions")
-	if projectID != "" {
-		q = q.Where("project_id = ?", projectID)
+
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Where("project_id = ?", pid)
+	} else {
+		q = q.Joins("JOIN projects ON projects.id = test_requests.project_id").Where("projects.workspace_id = ?", wsID)
 	}
+
 	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -494,8 +593,11 @@ func (h *Handler) RunAllTests(c *gin.Context) {
 // ListTestRuns - Test çalıştırma geçmişi (paginated)
 func (h *Handler) ListTestRuns(c *gin.Context) {
 	testID := c.Query("testId")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	projectIDStr := c.Query("projectId")
+	testRequestIDStr := c.Query("testRequestId")
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "0"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	wsID := h.getWorkspaceID(c)
 	if page < 1 {
 		page = 1
 	}
@@ -506,8 +608,21 @@ func (h *Handler) ListTestRuns(c *gin.Context) {
 
 	var runs []models.TestRun
 	q := h.DB.Model(&models.TestRun{}).Order("created_at DESC")
-	if testID != "" {
+	q = q.Where("workspace_id = ?", wsID)
+
+	if testID != "" { // This is likely testRequestID, but keeping original variable name
 		q = q.Where("test_request_id = ?", testID)
+	}
+	if testRequestIDStr != "" {
+		q = q.Where("test_request_id = ?", testRequestIDStr)
+	}
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Joins("JOIN test_requests ON test_requests.id = test_runs.test_request_id").Where("test_requests.project_id = ?", pid)
 	}
 
 	var total int64
@@ -518,8 +633,35 @@ func (h *Handler) ListTestRuns(c *gin.Context) {
 		return
 	}
 
+	// Enrich runs with test names
+	testIDs := make(map[uint]bool)
+	for _, r := range runs {
+		testIDs[r.TestRequestID] = true
+	}
+	nameMap := make(map[uint]string)
+	if len(testIDs) > 0 {
+		ids := make([]uint, 0, len(testIDs))
+		for id := range testIDs {
+			ids = append(ids, id)
+		}
+		var tests []models.TestRequest
+		h.DB.Select("id, name").Where("id IN ?", ids).Find(&tests)
+		for _, t := range tests {
+			nameMap[t.ID] = t.Name
+		}
+	}
+
+	type RunWithName struct {
+		models.TestRun
+		TestName string `json:"testName"`
+	}
+	enriched := make([]RunWithName, len(runs))
+	for i, r := range runs {
+		enriched[i] = RunWithName{TestRun: r, TestName: nameMap[r.TestRequestID]}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"data":  runs,
+		"data":  enriched,
 		"total": total,
 		"page":  page,
 		"limit": limit,
@@ -528,38 +670,44 @@ func (h *Handler) ListTestRuns(c *gin.Context) {
 
 // GetTestRun - Single run detail (for modal)
 func (h *Handler) GetTestRun(c *gin.Context) {
-	var run models.TestRun
-	if err := h.DB.First(&run, c.Param("id")).Error; err != nil {
+	var tr models.TestRun
+	if err := h.DB.First(&tr, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	wsID := h.getWorkspaceID(c)
+	if tr.WorkspaceID != wsID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+	// Rest of the logic to return run details...
 	var ar []runner.AssertionResult
-	if run.AssertionResults != "" {
-		_ = json.Unmarshal([]byte(run.AssertionResults), &ar)
+	if tr.AssertionResults != "" {
+		_ = json.Unmarshal([]byte(tr.AssertionResults), &ar)
 	}
 	if ar == nil {
 		ar = []runner.AssertionResult{}
 	}
 	resp := gin.H{
-		"passed":           run.Status == "passed",
-		"statusCode":       run.StatusCode,
-		"responseBody":     run.ResponseBody,
-		"durationMs":       run.DurationMs,
+		"passed":           tr.Status == "passed" || tr.Status == "success",
+		"statusCode":       tr.StatusCode,
+		"responseBody":     tr.ResponseBody,
+		"durationMs":       tr.DurationMs,
 		"assertionResults": ar,
-		"error":            run.ErrorMessage,
-		"runId":            run.ID,
-		"createdAt":        run.CreatedAt,
+		"error":            tr.ErrorMessage,
+		"runId":            tr.ID,
+		"createdAt":        tr.CreatedAt,
 	}
-	if run.RequestMethod != "" || run.RequestURL != "" {
+	if tr.RequestMethod != "" || tr.RequestURL != "" {
 		var headers map[string]string
-		if run.RequestHeaders != "" {
-			_ = json.Unmarshal([]byte(run.RequestHeaders), &headers)
+		if tr.RequestHeaders != "" {
+			_ = json.Unmarshal([]byte(tr.RequestHeaders), &headers)
 		}
 		resp["request"] = gin.H{
-			"method":  run.RequestMethod,
-			"url":     run.RequestURL,
+			"method":  tr.RequestMethod,
+			"url":     tr.RequestURL,
 			"headers": headers,
-			"body":    run.RequestBody,
+			"body":    tr.RequestBody,
 		}
 	}
 	c.JSON(http.StatusOK, resp)
@@ -567,22 +715,24 @@ func (h *Handler) GetTestRun(c *gin.Context) {
 
 // --- Dashboard ---
 func (h *Handler) GetDashboard(c *gin.Context) {
+	wsID := h.getWorkspaceID(c)
+
 	// Overall stats
 	var totalTests int64
-	h.DB.Model(&models.TestRequest{}).Count(&totalTests)
+	h.DB.Model(&models.TestRequest{}).Joins("JOIN projects ON projects.id = test_requests.project_id").Where("projects.workspace_id = ?", wsID).Count(&totalTests)
 
 	var totalRuns int64
-	h.DB.Model(&models.TestRun{}).Count(&totalRuns)
+	h.DB.Model(&models.TestRun{}).Where("workspace_id = ?", wsID).Count(&totalRuns)
 
 	var passedRuns int64
-	h.DB.Model(&models.TestRun{}).Where("status = ?", "passed").Count(&passedRuns)
+	h.DB.Model(&models.TestRun{}).Where("workspace_id = ? AND status IN ?", wsID, []string{"passed", "success"}).Count(&passedRuns)
 
 	var failedRuns int64
-	h.DB.Model(&models.TestRun{}).Where("status = ?", "failed").Count(&failedRuns)
+	h.DB.Model(&models.TestRun{}).Where("workspace_id = ? AND status = ?", wsID, "failed").Count(&failedRuns)
 
 	// Average duration
 	var avgDuration float64
-	h.DB.Model(&models.TestRun{}).Select("COALESCE(AVG(duration_ms), 0)").Row().Scan(&avgDuration)
+	h.DB.Model(&models.TestRun{}).Where("workspace_id = ?", wsID).Select("COALESCE(AVG(duration_ms), 0)").Row().Scan(&avgDuration)
 
 	// Recent runs (last 20)
 	var recentRuns []struct {
@@ -592,6 +742,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	h.DB.Table("test_runs").
 		Select("test_runs.*, test_requests.name as test_name").
 		Joins("LEFT JOIN test_requests ON test_runs.test_request_id = test_requests.id").
+		Where("test_runs.workspace_id = ?", wsID).
 		Order("test_runs.created_at DESC").
 		Limit(20).
 		Find(&recentRuns)
@@ -621,7 +772,7 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 	}
 
 	var projects []models.Project
-	h.DB.Find(&projects)
+	h.DB.Where("workspace_id = ?", wsID).Find(&projects)
 	projectStats := make([]projectStat, 0, len(projects))
 	for _, p := range projects {
 		var stat projectStat
@@ -681,12 +832,23 @@ func calculateRate(passed, total int64) float64 {
 
 // --- Schedules ---
 func (h *Handler) ListSchedules(c *gin.Context) {
-	projectID := c.Query("projectId")
+	projectIDStr := c.Query("projectId")
+	wsID := h.getWorkspaceID(c)
+
 	var list []models.Schedule
 	q := h.DB.Order("created_at DESC")
-	if projectID != "" {
-		q = q.Where("project_id = ?", projectID)
+
+	if projectIDStr != "" {
+		pid, _ := strconv.Atoi(projectIDStr)
+		if !h.hasProject(c, uint(pid)) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+			return
+		}
+		q = q.Where("project_id = ?", pid)
+	} else {
+		q = q.Joins("JOIN projects ON projects.id = schedules.project_id").Where("projects.workspace_id = ?", wsID)
 	}
+
 	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -700,12 +862,14 @@ func (h *Handler) CreateSchedule(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if !h.hasProject(c, req.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	if req.IntervalMins < 1 {
 		req.IntervalMins = 60
 	}
 	// Set next run to now + interval
-	nextRun := models.Schedule{}
-	_ = nextRun // avoid unused
 	now := func() *time.Time { t := time.Now().Add(time.Duration(req.IntervalMins) * time.Minute); return &t }()
 	req.NextRunAt = now
 
@@ -722,9 +886,17 @@ func (h *Handler) UpdateSchedule(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	if !h.hasProject(c, schedule.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
 	var body models.Schedule
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if body.ProjectID > 0 && !h.hasProject(c, body.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Forbidden project move"})
 		return
 	}
 	schedule.Name = body.Name
@@ -748,10 +920,16 @@ func (h *Handler) UpdateSchedule(c *gin.Context) {
 }
 
 func (h *Handler) DeleteSchedule(c *gin.Context) {
-	if err := h.DB.Delete(&models.Schedule{}, c.Param("id")).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	var schedule models.Schedule
+	if err := h.DB.First(&schedule, c.Param("id")).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
 		return
 	}
+	if !h.hasProject(c, schedule.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
+		return
+	}
+	h.DB.Delete(&schedule)
 	c.JSON(http.StatusOK, gin.H{"message": "deleted"})
 }
 
@@ -759,6 +937,10 @@ func (h *Handler) ToggleSchedule(c *gin.Context) {
 	var schedule models.Schedule
 	if err := h.DB.First(&schedule, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
+		return
+	}
+	if !h.hasProject(c, schedule.ProjectID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
 	schedule.Enabled = !schedule.Enabled

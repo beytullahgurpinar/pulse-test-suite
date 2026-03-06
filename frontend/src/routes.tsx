@@ -13,21 +13,52 @@ import { FlowHistoryPage } from './pages/FlowHistoryPage';
 import { FlowRunResultPage } from './pages/FlowRunResultPage';
 import { TestsPage } from './pages/TestsPage';
 import { FlowsPage } from './pages/FlowsPage';
+import { LoginPage } from './pages/LoginPage';
+import { AuthSuccessPage } from './pages/AuthSuccessPage';
+import { InvitePage } from './pages/InvitePage';
+import { UsersPage } from './pages/UsersPage';
+import { ResultsPage } from './pages/ResultsPage';
+
+const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = localStorage.getItem('token');
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+  return <>{children}</>;
+};
 
 export const router = createBrowserRouter([
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
+    path: '/auth/success',
+    element: <AuthSuccessPage />,
+  },
+  {
+    path: '/invite/:token',
+    element: <InvitePage />,
+  },
+  {
     path: '/',
-    element: <Layout />,
+    element: (
+      <ProtectedRoute>
+        <Layout />
+      </ProtectedRoute>
+    ),
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'p/:projectId/tests', element: <TestsPage /> },
       { path: 'p/:projectId/flows', element: <FlowsPage /> },
+      { path: 'p/:projectId/results', element: <ResultsPage /> },
       { path: 'p/:projectId/schedules', element: <SchedulesPage /> },
       { path: 'p/:projectId/env', element: <EnvPage /> },
       { path: 'p/:projectId', element: <Navigate to="tests" replace /> },
 
       { path: 'projects', element: <ProjectsPage /> },
+      { path: 'users', element: <UsersPage /> },
       { path: 'p/:projectId/tests/new', element: <TestFormPage /> },
       { path: 'p/:projectId/flows/new', element: <FlowFormPage /> },
       { path: 'p/:projectId/flows/:id/edit', element: <FlowFormPage /> },
