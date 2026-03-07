@@ -1,5 +1,5 @@
 import type {
-  TestRequest, RunResult, TestRun, Project, EnvVar, DashboardData,
+  TestRequest, RunResult, TestRun, Project, EnvVar, Environment, DashboardData,
   Schedule, Category, Flow, FlowRun, PaginatedResponse
 } from './types';
 
@@ -49,11 +49,23 @@ export const api = {
   deleteProject: (id: number) =>
     fetchApi<{ message: string }>(`/projects/${id}`, { method: 'DELETE' }),
 
+  // Environments
+  listEnvironments: (projectId: number) =>
+    fetchApi<Environment[]>(`/environments?projectId=${projectId}`),
+  createEnvironment: (data: { projectId: number; name: string }) =>
+    fetchApi<Environment>('/environments', { method: 'POST', body: JSON.stringify(data) }),
+  updateEnvironment: (id: number, data: { name?: string; isDefault?: boolean }) =>
+    fetchApi<Environment>(`/environments/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteEnvironment: (id: number) =>
+    fetchApi<{ message: string }>(`/environments/${id}`, { method: 'DELETE' }),
+  duplicateEnvironment: (id: number) =>
+    fetchApi<Environment>(`/environments/${id}/duplicate`, { method: 'POST' }),
+
   // Env Vars
-  listEnvVars: (projectId: number) =>
-    fetchApi<EnvVar[]>(`/env-vars?projectId=${projectId}`),
+  listEnvVars: (projectId: number, environmentId?: number) =>
+    fetchApi<EnvVar[]>(`/env-vars?projectId=${projectId}${environmentId ? `&environmentId=${environmentId}` : ''}`),
   getEnvVar: (id: number) => fetchApi<EnvVar>(`/env-vars/${id}`),
-  createEnvVar: (data: { projectId: number; name: string; value: string; secured?: boolean }) =>
+  createEnvVar: (data: { projectId: number; environmentId: number; name: string; value: string; secured?: boolean }) =>
     fetchApi<EnvVar>('/env-vars', { method: 'POST', body: JSON.stringify(data) }),
   updateEnvVar: (id: number, data: { name: string; value: string; secured?: boolean }) =>
     fetchApi<EnvVar>(`/env-vars/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
@@ -72,11 +84,14 @@ export const api = {
     fetchApi<{ message: string }>(`/tests/${id}`, { method: 'DELETE' }),
   duplicateTest: (id: number) =>
     fetchApi<TestRequest>(`/tests/${id}/duplicate`, { method: 'POST' }),
-  runTest: (id: number) =>
-    fetchApi<RunResult>(`/tests/${id}/run`, { method: 'POST' }),
-  runAllTests: (projectId?: number) =>
+  runTest: (id: number, environmentId?: number) =>
+    fetchApi<RunResult>(`/tests/${id}/run`, {
+      method: 'POST',
+      body: environmentId ? JSON.stringify({ environmentId }) : undefined,
+    }),
+  runAllTests: (projectId?: number, environmentId?: number) =>
     fetchApi<{ results: Array<RunResult & { testId: number; testName: string }> }>(
-      `/tests/run-all${projectId ? `?projectId=${projectId}` : ''}`,
+      `/tests/run-all${projectId ? `?projectId=${projectId}` : ''}${environmentId ? `${projectId ? '&' : '?'}environmentId=${environmentId}` : ''}`,
       { method: 'POST' }
     ),
   listRuns: (testId?: number, page: number = 1, limit: number = 20, projectId?: number) =>
@@ -110,8 +125,11 @@ export const api = {
     fetchApi<Flow>(`/flows/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFlow: (id: number) =>
     fetchApi<{ message: string }>(`/flows/${id}`, { method: 'DELETE' }),
-  runFlow: (id: number) =>
-    fetchApi<FlowRun>(`/flows/${id}/run`, { method: 'POST' }),
+  runFlow: (id: number, environmentId?: number) =>
+    fetchApi<FlowRun>(`/flows/${id}/run`, {
+      method: 'POST',
+      body: environmentId ? JSON.stringify({ environmentId }) : undefined,
+    }),
   listFlowRuns: (flowId?: number, page: number = 1, limit: number = 20) =>
     fetchApi<PaginatedResponse<FlowRun>>(`/flows/runs?page=${page}&limit=${limit}${flowId ? `&flowId=${flowId}` : ''}`),
   getFlowRun: (id: number) =>

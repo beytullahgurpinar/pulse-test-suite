@@ -73,6 +73,13 @@ func main() {
 			// Projects list - All roles
 			protected.GET("/projects", h.ListProjects)
 
+			// Environments
+			protected.GET("/environments", h.ListEnvironments)
+			protected.POST("/environments", h.CreateEnvironment)
+			protected.PUT("/environments/:id", h.UpdateEnvironment)
+			protected.DELETE("/environments/:id", h.DeleteEnvironment)
+			protected.POST("/environments/:id/duplicate", h.DuplicateEnvironment)
+
 			protected.GET("/env-vars", h.ListEnvVars)
 			protected.GET("/env-vars/:id", h.GetEnvVar)
 			protected.POST("/env-vars", h.CreateEnvVar)

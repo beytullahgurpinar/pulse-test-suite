@@ -20,7 +20,8 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
-import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
+import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import { api } from '../api';
 import type { Flow, FlowStep, TestRequest } from '../types';
@@ -61,6 +62,24 @@ export function FlowFormPage() {
 
     const removeStep = (index: number) => {
         const updated = steps.filter((_, i) => i !== index);
+        setSteps(updated.map((s, i) => ({ ...s, orderNum: i })));
+    };
+
+    const moveStepUp = (index: number) => {
+        if (index === 0) return;
+        const updated = [...steps];
+        const temp = updated[index];
+        updated[index] = updated[index - 1];
+        updated[index - 1] = temp;
+        setSteps(updated.map((s, i) => ({ ...s, orderNum: i })));
+    };
+
+    const moveStepDown = (index: number) => {
+        if (index === steps.length - 1) return;
+        const updated = [...steps];
+        const temp = updated[index];
+        updated[index] = updated[index + 1];
+        updated[index + 1] = temp;
         setSteps(updated.map((s, i) => ({ ...s, orderNum: i })));
     };
 
@@ -200,8 +219,33 @@ export function FlowFormPage() {
                                         }}
                                     >
                                         <Box display="flex" alignItems="flex-start" gap={2}>
-                                            <Box sx={{ mt: 1, color: 'text.tertiary', cursor: 'grab' }}>
-                                                <DragIndicatorIcon />
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, mt: 1, mr: 1, alignItems: 'center' }}>
+                                                <IconButton
+                                                    size="sm"
+                                                    variant="plain"
+                                                    color="neutral"
+                                                    disabled={idx === 0}
+                                                    onClick={() => moveStepUp(idx)}
+                                                    sx={{ '--IconButton-size': '24px' }}
+                                                >
+                                                    <KeyboardArrowUpRoundedIcon />
+                                                </IconButton>
+                                                <Box sx={{
+                                                    width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    bgcolor: 'primary.solidBg', color: 'white', borderRadius: '50%', fontSize: '0.75rem', fontWeight: 700
+                                                }}>
+                                                    {idx + 1}
+                                                </Box>
+                                                <IconButton
+                                                    size="sm"
+                                                    variant="plain"
+                                                    color="neutral"
+                                                    disabled={idx === steps.length - 1}
+                                                    onClick={() => moveStepDown(idx)}
+                                                    sx={{ '--IconButton-size': '24px' }}
+                                                >
+                                                    <KeyboardArrowDownRoundedIcon />
+                                                </IconButton>
                                             </Box>
                                             <Box sx={{ flex: 1 }}>
                                                 <Box display="flex" gap={2} mb={2}>

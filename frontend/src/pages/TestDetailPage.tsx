@@ -6,6 +6,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ScienceIcon from '@mui/icons-material/Science';
 import { PageHeader } from '../components/PageHeader';
+import { EnvironmentSelect } from '../components/EnvironmentSelect';
+import { useEnvironments } from '../hooks/useEnvironments';
 import type { TestRequest, RunResult } from '../types';
 import { api } from '../api';
 import { RunResults } from '../components/RunResults';
@@ -14,10 +16,13 @@ export function TestDetailPage() {
   const { projectId, id } = useParams();
   const navigate = useNavigate();
   const testId = id ? parseInt(id, 10) : null;
+  const pid = projectId ? parseInt(projectId, 10) : null;
 
   const [test, setTest] = useState<TestRequest | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [running, setRunning] = useState(false);
+
+  const { environments, selectedEnvId, setSelectedEnvId } = useEnvironments(pid);
 
   useEffect(() => {
     if (testId) {
@@ -30,7 +35,7 @@ export function TestDetailPage() {
     setRunning(true);
     setResult(null);
     try {
-      const res = await api.runTest(testId);
+      const res = await api.runTest(testId, selectedEnvId);
       setResult(res);
     } catch (e) {
       setResult({
@@ -77,6 +82,11 @@ export function TestDetailPage() {
             >
               Edit
             </Button>
+            <EnvironmentSelect
+              environments={environments}
+              value={selectedEnvId}
+              onChange={setSelectedEnvId}
+            />
             <Button
               variant="soft"
               color="primary"

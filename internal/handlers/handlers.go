@@ -104,6 +104,7 @@ func (h *Handler) DeleteProject(c *gin.Context) {
 	}
 
 	err := h.DB.Transaction(func(tx *gorm.DB) error {
+		tx.Where("project_id = ?", id).Delete(&models.Environment{})
 		tx.Where("project_id = ?", id).Delete(&models.EnvVar{})
 		// Delete schedules for project
 		tx.Where("project_id = ?", id).Delete(&models.Schedule{})
@@ -137,7 +138,12 @@ func (h *Handler) ListEnvVars(c *gin.Context) {
 	}
 
 	var list []models.EnvVar
-	if err := h.DB.Where("project_id = ?", pid).Find(&list).Error; err != nil {
+	q := h.DB.Where("project_id = ?", pid)
+	if envIDStr := c.Query("environmentId"); envIDStr != "" {
+		envID, _ := strconv.Atoi(envIDStr)
+		q = q.Where("environment_id = ?", envID)
+	}
+	if err := q.Find(&list).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -172,10 +178,11 @@ func (h *Handler) GetEnvVar(c *gin.Context) {
 
 func (h *Handler) CreateEnvVar(c *gin.Context) {
 	var req struct {
-		ProjectID uint   `json:"projectId"`
-		Name      string `json:"name"`
-		Value     string `json:"value"`
-		Secured   bool   `json:"secured"`
+		ProjectID     uint   `json:"projectId"`
+		EnvironmentID uint   `json:"environmentId"`
+		Name          string `json:"name"`
+		Value         string `json:"value"`
+		Secured       bool   `json:"secured"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
@@ -194,7 +201,7 @@ func (h *Handler) CreateEnvVar(c *gin.Context) {
 		}
 		value = enc
 	}
-	ev := models.EnvVar{ProjectID: req.ProjectID, Name: req.Name, Value: value, Secured: req.Secured}
+	ev := models.EnvVar{ProjectID: req.ProjectID, EnvironmentID: req.EnvironmentID, Name: req.Name, Value: value, Secured: req.Secured}
 	if err := h.DB.Create(&ev).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -495,6 +502,11 @@ func (h *Handler) DuplicateTestRequest(c *gin.Context) {
 
 // RunTest - Tek test çalıştır
 func (h *Handler) RunTest(c *gin.Context) {
+	var body struct {
+		EnvironmentID *uint `json:"environmentId"`
+	}
+	_ = c.ShouldBindJSON(&body) // optional body
+
 	var testReq models.TestRequest
 	if err := h.DB.Preload("Assertions").First(&testReq, c.Param("id")).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not found"})
@@ -505,7 +517,7 @@ func (h *Handler) RunTest(c *gin.Context) {
 		return
 	}
 
-	testRun, err := h.execution.ExecuteAndSaveTest(&testReq, nil)
+	testRun, err := h.execution.ExecuteAndSaveTest(&testReq, nil, body.EnvironmentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -546,6 +558,13 @@ func (h *Handler) RunAllTests(c *gin.Context) {
 	projectIDStr := c.Query("projectId")
 	wsID := h.getWorkspaceID(c)
 
+	var envID *uint
+	if envIDStr := c.Query("environmentId"); envIDStr != "" {
+		id, _ := strconv.Atoi(envIDStr)
+		envIDVal := uint(id)
+		envID = &envIDVal
+	}
+
 	var list []models.TestRequest
 	q := h.DB.Preload("Assertions")
 
@@ -567,7 +586,7 @@ func (h *Handler) RunAllTests(c *gin.Context) {
 
 	results := []gin.H{}
 	for _, req := range list {
-		testRun, _ := h.execution.ExecuteAndSaveTest(&req, nil)
+		testRun, _ := h.execution.ExecuteAndSaveTest(&req, nil, envID)
 
 		var ar []runner.AssertionResult
 		if testRun.AssertionResults != "" {

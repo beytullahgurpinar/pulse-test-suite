@@ -32,9 +32,10 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import ScienceRoundedIcon from '@mui/icons-material/ScienceRounded';
-import type { Schedule, Project, TestRequest, Flow } from '../types';
+import type { Schedule, Project, TestRequest, Flow, Environment } from '../types';
 import { api } from '../api';
 import { PageHeader } from '../components/PageHeader';
+import PublicRoundedIcon from '@mui/icons-material/PublicRounded';
 
 const INTERVAL_OPTIONS = [
     { value: 5, label: 'Every 5 minutes' },
@@ -68,6 +69,7 @@ interface ScheduleFormData {
     runAllTests: boolean;
     testRequestId?: number;
     flowId?: number;
+    environmentId?: number;
     webhookUrl: string;
     notifyOnFail: boolean;
     notifyOnSuccess: boolean;
@@ -93,6 +95,8 @@ export function SchedulesPage() {
     const [projects, setProjects] = useState<Project[]>([]);
     const [tests, setTests] = useState<TestRequest[]>([]);
     const [flows, setFlows] = useState<Flow[]>([]);
+    const [environments, setEnvironments] = useState<Environment[]>([]);
+    const [allEnvironments, setAllEnvironments] = useState<Environment[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
     const [editId, setEditId] = useState<number | null>(null);
@@ -108,6 +112,12 @@ export function SchedulesPage() {
             ]);
             setSchedules(s);
             setProjects(p);
+
+            const projIds = Array.from(new Set(s.map(sch => sch.projectId)));
+            const envsArrays = await Promise.all(
+                projIds.map(id => api.listEnvironments(id).catch(() => []))
+            );
+            setAllEnvironments(envsArrays.flat());
         } catch { /* ignore */ }
         setLoading(false);
     }, [pid]);
@@ -116,15 +126,18 @@ export function SchedulesPage() {
 
     const loadProjectResources = async (projectId: number) => {
         if (projectId > 0) {
-            const [t, f] = await Promise.all([
+            const [t, f, e] = await Promise.all([
                 api.listTests(projectId),
-                api.listFlows(projectId)
+                api.listFlows(projectId),
+                api.listEnvironments(projectId),
             ]);
             setTests(t);
             setFlows(f);
+            setEnvironments(e ?? []);
         } else {
             setTests([]);
             setFlows([]);
+            setEnvironments([]);
         }
     };
 
@@ -152,6 +165,7 @@ export function SchedulesPage() {
             runAllTests: s.runAllTests,
             testRequestId: s.testRequestId,
             flowId: s.flowId,
+            environmentId: s.environmentId,
             webhookUrl: s.webhookUrl,
             notifyOnFail: s.notifyOnFail,
             notifyOnSuccess: s.notifyOnSuccess,
@@ -321,6 +335,12 @@ export function SchedulesPage() {
                                                 >
                                                     {s.runAllTests ? 'All Tests' : s.flowId ? 'Flow Execution' : 'Single Test'}
                                                 </Chip>
+                                                {s.environmentId && (
+                                                    <Chip size="sm" variant="outlined" startDecorator={<PublicRoundedIcon sx={{ fontSize: 14 }} />}
+                                                        sx={{ fontWeight: 600, fontSize: '0.7rem' }}>
+                                                        {allEnvironments.find(e => e.id === s.environmentId)?.name || `Env #${s.environmentId}`}
+                                                    </Chip>
+                                                )}
                                             </Box>
                                             <Box sx={{ display: 'flex', gap: 3, mt: 1.5 }}>
                                                 <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.65rem' }}>
@@ -423,6 +443,25 @@ export function SchedulesPage() {
                                 </Box>
                             </RadioGroup>
                         </FormControl>
+
+                        {environments.length > 0 && (
+                            <FormControl>
+                                <FormLabel sx={{ fontWeight: 600, fontSize: '0.78rem' }}>Environment (optional)</FormLabel>
+                                <Select
+                                    value={form.environmentId || 0}
+                                    onChange={(_, v) => setForm(f => ({ ...f, environmentId: (v as number) || undefined }))}
+                                    sx={{ borderRadius: '8px' }}
+                                    placeholder="Use project default"
+                                >
+                                    <Option value={0}>Project Default</Option>
+                                    {environments.map(e => (
+                                        <Option key={e.id} value={e.id}>
+                                            {e.name}{e.isDefault ? ' (default)' : ''}
+                                        </Option>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                        )}
 
                         {runType === 'test' && (
                             <FormControl required>

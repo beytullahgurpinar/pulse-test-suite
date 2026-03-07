@@ -52,7 +52,7 @@ export function EnvVarsDrawer({ open, onClose, projectId, projectName }: Props) 
   const handleAdd = async () => {
     if (!projectId || !addName.trim()) return;
     try {
-      await api.createEnvVar({ projectId, name: addName.trim(), value: addValue, secured: false });
+      await api.createEnvVar({ projectId, environmentId: 0, name: addName.trim(), value: addValue, secured: false });
       setAddName('');
       setAddValue('');
       const list = await api.listEnvVars(projectId);

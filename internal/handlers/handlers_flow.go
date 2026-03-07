@@ -147,6 +147,11 @@ func (h *Handler) DeleteFlow(c *gin.Context) {
 }
 
 func (h *Handler) RunFlow(c *gin.Context) {
+	var body struct {
+		EnvironmentID *uint `json:"environmentId"`
+	}
+	_ = c.ShouldBindJSON(&body) // optional body
+
 	id, _ := strconv.Atoi(c.Param("id"))
 	// Check access
 	var flow models.Flow
@@ -158,7 +163,7 @@ func (h *Handler) RunFlow(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
-	run, err := h.execution.ExecuteAndSaveFlow(uint(id), nil)
+	run, err := h.execution.ExecuteAndSaveFlow(uint(id), nil, body.EnvironmentID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

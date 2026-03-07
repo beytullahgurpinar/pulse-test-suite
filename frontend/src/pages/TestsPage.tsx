@@ -25,6 +25,8 @@ import { TestResultsCards } from '../components/TestResultsCards';
 import { RunResults } from '../components/RunResults';
 import { RunningOverlay } from '../components/RunningOverlay';
 import { PageHeader } from '../components/PageHeader';
+import { EnvironmentSelect } from '../components/EnvironmentSelect';
+import { useEnvironments } from '../hooks/useEnvironments';
 
 export function TestsPage() {
     const { projectId } = useParams();
@@ -42,6 +44,8 @@ export function TestsPage() {
 
     const [categoryModalOpen, setCategoryModalOpen] = useState(false);
     const [newCatName, setNewCatName] = useState('');
+
+    const { environments, selectedEnvId, setSelectedEnvId } = useEnvironments(pid);
 
     const loadData = async (id: number) => {
         setLoading(true);
@@ -71,7 +75,7 @@ export function TestsPage() {
         setRunningTestId(id);
         const t = tests.find((x) => x.id === id);
         try {
-            const res = await api.runTest(id);
+            const res = await api.runTest(id, selectedEnvId);
             setLastResult(res);
             setLastTestName(t?.name || '');
         } catch (e) {
@@ -94,7 +98,7 @@ export function TestsPage() {
         setRunningAll(true);
         setAllResults(null);
         try {
-            const { results } = await api.runAllTests(pid);
+            const { results } = await api.runAllTests(pid, selectedEnvId);
             setAllResults(results);
             setTests(await api.listTests(pid));
         } catch (e) {
@@ -155,6 +159,11 @@ export function TestsPage() {
                         >
                             New Test
                         </Button>
+                        <EnvironmentSelect
+                            environments={environments}
+                            value={selectedEnvId}
+                            onChange={setSelectedEnvId}
+                        />
                         <Button
                             size="sm"
                             startDecorator={runningAll ? <CircularProgress size="sm" /> : <PlayArrowRoundedIcon sx={{ fontSize: 18 }} />}

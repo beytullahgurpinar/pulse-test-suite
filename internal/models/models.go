@@ -82,15 +82,26 @@ type Category struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// EnvVar - Proje ortam değişkenleri ({{base_url}}, {{api_key}} vb.)
-type EnvVar struct {
+// Environment - Named container for env vars (Production, Staging, Dev, etc.)
+type Environment struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
-	ProjectID uint      `json:"projectId" gorm:"not null"`
-	Name      string    `json:"name" gorm:"size:100;not null"`
-	Value     string    `json:"value" gorm:"type:text"`
-	Secured   bool      `json:"secured" gorm:"default:false"`
+	ProjectID uint      `json:"projectId" gorm:"not null;index;uniqueIndex:idx_env_project_name"`
+	Name      string    `json:"name" gorm:"size:255;not null;uniqueIndex:idx_env_project_name"`
+	IsDefault bool      `json:"isDefault" gorm:"default:false"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// EnvVar - Proje ortam değişkenleri ({{base_url}}, {{api_key}} vb.)
+type EnvVar struct {
+	ID            uint      `json:"id" gorm:"primaryKey"`
+	ProjectID     uint      `json:"projectId" gorm:"not null"`
+	EnvironmentID uint      `json:"environmentId" gorm:"not null;index"`
+	Name          string    `json:"name" gorm:"size:100;not null"`
+	Value         string    `json:"value" gorm:"type:text"`
+	Secured       bool      `json:"secured" gorm:"default:false"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 // TestRequest - API test definition
@@ -148,13 +159,14 @@ type Schedule struct {
 	ProjectID       uint       `json:"projectId" gorm:"not null"`
 	Name            string     `json:"name" gorm:"size:255;not null"`
 	IntervalMins    int        `json:"intervalMins" gorm:"not null;default:60"` // interval in minutes
-	Enabled         bool       `json:"enabled" gorm:"default:true"`
-	RunAllTests     bool       `json:"runAllTests" gorm:"default:true"`             // true=all project tests, false=specific test
+	Enabled         bool       `json:"enabled"`
+	RunAllTests     bool       `json:"runAllTests"`                                 // true=all project tests, false=specific test
 	TestRequestID   *uint      `json:"testRequestId,omitempty" gorm:"default:null"` // specific test (if runAllTests=false)
 	FlowID          *uint      `json:"flowId,omitempty" gorm:"default:null"`        // run specific flow instead of single test
+	EnvironmentID   *uint      `json:"environmentId,omitempty" gorm:"default:null"` // specific environment (nil = project default)
 	WebhookURL      string     `json:"webhookUrl" gorm:"type:text"`                 // webhook for notifications
-	NotifyOnFail    bool       `json:"notifyOnFail" gorm:"default:true"`            // send webhook on failure
-	NotifyOnSuccess bool       `json:"notifyOnSuccess" gorm:"default:false"`        // send webhook on success
+	NotifyOnFail    bool       `json:"notifyOnFail"`                                // send webhook on failure
+	NotifyOnSuccess bool       `json:"notifyOnSuccess"`                             // send webhook on success
 	LastRunAt       *time.Time `json:"lastRunAt"`
 	NextRunAt       *time.Time `json:"nextRunAt"`
 	CreatedAt       time.Time  `json:"createdAt"`

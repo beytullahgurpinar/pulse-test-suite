@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sort"
 	"strings"
@@ -26,10 +27,27 @@ func NewExecutionService(db *gorm.DB, encryptionKey string) *ExecutionService {
 	}
 }
 
-// LoadEnvMap loads env vars for project, decrypts secured ones
-func (s *ExecutionService) LoadEnvMap(projectID uint) (map[string]string, []string) {
+// GetDefaultEnvironmentID returns the default environment ID for a project
+func (s *ExecutionService) GetDefaultEnvironmentID(projectID uint) (uint, error) {
+	var env models.Environment
+	if err := s.DB.Where("project_id = ? AND is_default = ?", projectID, true).First(&env).Error; err != nil {
+		return 0, fmt.Errorf("no default environment for project %d", projectID)
+	}
+	return env.ID, nil
+}
+
+// ResolveEnvironmentID returns the given environmentID if non-nil, otherwise the project's default
+func (s *ExecutionService) ResolveEnvironmentID(environmentID *uint, projectID uint) (uint, error) {
+	if environmentID != nil && *environmentID > 0 {
+		return *environmentID, nil
+	}
+	return s.GetDefaultEnvironmentID(projectID)
+}
+
+// LoadEnvMap loads env vars for a specific environment, decrypts secured ones
+func (s *ExecutionService) LoadEnvMap(environmentID uint) (map[string]string, []string) {
 	var envVars []models.EnvVar
-	s.DB.Where("project_id = ?", projectID).Find(&envVars)
+	s.DB.Where("environment_id = ?", environmentID).Find(&envVars)
 	envMap := make(map[string]string)
 	var securedNames []string
 	for _, ev := range envVars {
@@ -75,8 +93,12 @@ func MaskSecuredInRequest(url string, headers map[string]string, body string, en
 }
 
 // ExecuteAndSaveTest runs a single test and saves the result
-func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, scheduleID *uint) (*models.TestRun, error) {
-	envMap, securedNames := s.LoadEnvMap(test.ProjectID)
+func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, scheduleID *uint, environmentID *uint) (*models.TestRun, error) {
+	envID, err := s.ResolveEnvironmentID(environmentID, test.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	envMap, securedNames := s.LoadEnvMap(envID)
 	result := runner.ExecuteTest(test, envMap)
 
 	maskedURL, maskedHeaders, maskedBody := MaskSecuredInRequest(
@@ -117,7 +139,7 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 }
 
 // ExecuteAndSaveFlow runs a flow and saves results
-func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint) (*models.FlowRun, error) {
+func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint, environmentID *uint) (*models.FlowRun, error) {
 	var flow models.Flow
 	if err := s.DB.Preload("Project").Preload("Steps", func(db *gorm.DB) *gorm.DB {
 		return db.Order("order_num ASC")
@@ -125,7 +147,11 @@ func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint) (*m
 		return nil, err
 	}
 
-	envMap, securedNames := s.LoadEnvMap(flow.ProjectID)
+	envID, err := s.ResolveEnvironmentID(environmentID, flow.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	envMap, securedNames := s.LoadEnvMap(envID)
 
 	flowRun := models.FlowRun{
 		FlowID:      flow.ID,

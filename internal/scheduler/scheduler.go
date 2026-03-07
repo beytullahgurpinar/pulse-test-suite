@@ -85,7 +85,7 @@ func (s *Scheduler) runSchedule(schedule *models.Schedule, now time.Time) {
 
 		for _, test := range tests {
 			totalTests++
-			run, err := s.execution.ExecuteAndSaveTest(&test, &schedule.ID)
+			run, err := s.execution.ExecuteAndSaveTest(&test, &schedule.ID, schedule.EnvironmentID)
 			if err == nil && run.Status == "passed" {
 				passedTests++
 			} else {
@@ -97,7 +97,7 @@ func (s *Scheduler) runSchedule(schedule *models.Schedule, now time.Time) {
 		var flow models.Flow
 		if err := s.db.First(&flow, *schedule.FlowID).Error; err == nil {
 			totalTests++
-			run, err := s.execution.ExecuteAndSaveFlow(flow.ID, &schedule.ID)
+			run, err := s.execution.ExecuteAndSaveFlow(flow.ID, &schedule.ID, schedule.EnvironmentID)
 			if err == nil && run.Status == "passed" {
 				passedTests++
 			} else {
@@ -109,7 +109,7 @@ func (s *Scheduler) runSchedule(schedule *models.Schedule, now time.Time) {
 		var test models.TestRequest
 		if err := s.db.Preload("Assertions").First(&test, *schedule.TestRequestID).Error; err == nil {
 			totalTests++
-			run, err := s.execution.ExecuteAndSaveTest(&test, &schedule.ID)
+			run, err := s.execution.ExecuteAndSaveTest(&test, &schedule.ID, schedule.EnvironmentID)
 			if err == nil && run.Status == "passed" {
 				passedTests++
 			} else {

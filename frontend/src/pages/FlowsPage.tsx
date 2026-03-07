@@ -13,6 +13,8 @@ import type { Flow } from '../types';
 import { api } from '../api';
 import { FlowList } from '../components/FlowList';
 import { PageHeader } from '../components/PageHeader';
+import { EnvironmentSelect } from '../components/EnvironmentSelect';
+import { useEnvironments } from '../hooks/useEnvironments';
 
 export function FlowsPage() {
     const { projectId } = useParams();
@@ -22,6 +24,7 @@ export function FlowsPage() {
     const [flows, setFlows] = useState<Flow[]>([]);
     const [loading, setLoading] = useState(true);
     const [runningFlowId, setRunningFlowId] = useState<number | null>(null);
+    const { environments, selectedEnvId, setSelectedEnvId } = useEnvironments(pid);
 
     const loadData = async (id: number) => {
         setLoading(true);
@@ -44,7 +47,7 @@ export function FlowsPage() {
     const handleRunFlow = async (id: number) => {
         setRunningFlowId(id);
         try {
-            const run = await api.runFlow(id);
+            const run = await api.runFlow(id, selectedEnvId);
             navigate(`/flows/runs/${run.id}`);
         } catch (err) {
             console.error('Failed to run flow', err);
@@ -62,6 +65,12 @@ export function FlowsPage() {
                 description="Sequential test execution sequences"
                 icon={<AccountTreeRoundedIcon sx={{ fontSize: 22 }} />}
                 actions={
+                    <>
+                    <EnvironmentSelect
+                        environments={environments}
+                        value={selectedEnvId}
+                        onChange={setSelectedEnvId}
+                    />
                     <Button
                         size="sm"
                         startDecorator={<AddRoundedIcon sx={{ fontSize: 18 }} />}
@@ -79,6 +88,7 @@ export function FlowsPage() {
                     >
                         New Flow
                     </Button>
+                    </>
                 }
             />
 

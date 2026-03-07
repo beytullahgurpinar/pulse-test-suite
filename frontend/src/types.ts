@@ -5,9 +5,19 @@ export interface Project {
   updatedAt?: string;
 }
 
+export interface Environment {
+  id: number;
+  projectId: number;
+  name: string;
+  isDefault: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface EnvVar {
   id: number;
   projectId: number;
+  environmentId: number;
   name: string;
   value: string;
   secured?: boolean;
@@ -131,6 +141,7 @@ export interface Schedule {
   runAllTests: boolean;
   testRequestId?: number;
   flowId?: number;
+  environmentId?: number;
   webhookUrl: string;
   notifyOnFail: boolean;
   notifyOnSuccess: boolean;

@@ -29,6 +29,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		&models.User{},
 		&models.Project{},
 		&models.Category{},
+		&models.Environment{},
 		&models.EnvVar{},
 		&models.TestRequest{},
 		&models.Assertion{},
@@ -56,6 +57,21 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	db.Model(&models.Project{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
 	db.Model(&models.TestRun{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
 	db.Model(&models.FlowRun{}).Where("workspace_id = 0").Update("workspace_id", ws.ID)
+
+	// Create default environments for projects that have none
+	var allProjects []models.Project
+	db.Find(&allProjects)
+	for _, p := range allProjects {
+		var envCount int64
+		db.Model(&models.Environment{}).Where("project_id = ?", p.ID).Count(&envCount)
+		if envCount == 0 {
+			env := models.Environment{ProjectID: p.ID, Name: "Default", IsDefault: true}
+			db.Create(&env)
+			db.Model(&models.EnvVar{}).
+				Where("project_id = ? AND (environment_id IS NULL OR environment_id = 0)", p.ID).
+				Update("environment_id", env.ID)
+		}
+	}
 
 	// Ensure atleast one project exists
 	var pCount int64
