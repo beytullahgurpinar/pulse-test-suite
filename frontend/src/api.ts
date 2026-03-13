@@ -72,6 +72,12 @@ export const api = {
   deleteEnvVar: (id: number) =>
     fetchApi<{ message: string }>(`/env-vars/${id}`, { method: 'DELETE' }),
 
+  // Import
+  importPostman: (data: { projectId: number; categoryId?: number | null; content: string; dryRun?: boolean }) =>
+    fetchApi<{ count?: number; items?: Array<{name: string; method: string; url: string; categoryName?: string}>; imported?: number; updated?: number; skipped?: number }>('/import/postman', { method: 'POST', body: JSON.stringify(data) }),
+  importOpenAPI: (data: { projectId: number; categoryId?: number | null; content: string; dryRun?: boolean }) =>
+    fetchApi<{ count?: number; items?: Array<{name: string; method: string; url: string; categoryName?: string}>; imported?: number; updated?: number; skipped?: number }>('/import/openapi', { method: 'POST', body: JSON.stringify(data) }),
+
   // Tests
   listTests: (projectId?: number) =>
     fetchApi<TestRequest[]>(`/tests${projectId ? `?projectId=${projectId}` : ''}`),

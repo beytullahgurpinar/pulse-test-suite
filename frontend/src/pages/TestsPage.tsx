@@ -13,11 +13,15 @@ import {
     FormControl,
     FormLabel,
     Input,
+    Select,
+    Option,
+    Divider,
 } from '@mui/joy';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import CreateNewFolderRoundedIcon from '@mui/icons-material/CreateNewFolderRounded';
 import FolderOpenRoundedIcon from '@mui/icons-material/FolderOpenRounded';
+import FileUploadRoundedIcon from '@mui/icons-material/FileUploadRounded';
 import type { TestRequest, RunResult, Category } from '../types';
 import { api } from '../api';
 import { TestList } from '../components/TestList';
@@ -26,6 +30,7 @@ import { RunResults } from '../components/RunResults';
 import { RunningOverlay } from '../components/RunningOverlay';
 import { PageHeader } from '../components/PageHeader';
 import { EnvironmentSelect } from '../components/EnvironmentSelect';
+import { ImportModal } from '../components/ImportModal';
 import { useEnvironments } from '../hooks/useEnvironments';
 
 export function TestsPage() {
@@ -38,12 +43,16 @@ export function TestsPage() {
     const [loading, setLoading] = useState(true);
     const [lastResult, setLastResult] = useState<RunResult | null>(null);
     const [lastTestName, setLastTestName] = useState('');
+    const [lastTestId, setLastTestId] = useState<number | null>(null);
+    const [resultModalOpen, setResultModalOpen] = useState(false);
     const [runningAll, setRunningAll] = useState(false);
     const [runningTestId, setRunningTestId] = useState<number | null>(null);
     const [allResults, setAllResults] = useState<Array<RunResult & { testId: number; testName: string }> | null>(null);
 
     const [categoryModalOpen, setCategoryModalOpen] = useState(false);
     const [newCatName, setNewCatName] = useState('');
+    const [newCatParentId, setNewCatParentId] = useState<number | null>(null);
+    const [importModalOpen, setImportModalOpen] = useState(false);
 
     const { environments, selectedEnvId, setSelectedEnvId } = useEnvironments(pid);
 
@@ -78,6 +87,8 @@ export function TestsPage() {
             const res = await api.runTest(id, selectedEnvId);
             setLastResult(res);
             setLastTestName(t?.name || '');
+            setLastTestId(id);
+            setResultModalOpen(true);
         } catch (e) {
             setLastResult({
                 passed: false,
@@ -88,6 +99,8 @@ export function TestsPage() {
                 error: e instanceof Error ? e.message : 'Error',
             });
             setLastTestName(t?.name || '');
+            setLastTestId(id);
+            setResultModalOpen(true);
         } finally {
             setRunningTestId(null);
         }
@@ -121,8 +134,9 @@ export function TestsPage() {
         e.preventDefault();
         if (!pid || !newCatName.trim()) return;
         try {
-            await api.createCategory({ projectId: pid, name: newCatName.trim(), parentId: null });
+            await api.createCategory({ projectId: pid, name: newCatName.trim(), parentId: newCatParentId });
             setNewCatName('');
+            setNewCatParentId(null);
             setCategoryModalOpen(false);
             loadData(pid);
         } catch (err) {
@@ -141,6 +155,15 @@ export function TestsPage() {
                 icon={<FolderOpenRoundedIcon sx={{ fontSize: 22 }} />}
                 actions={
                     <>
+                        <Button
+                            variant="outlined"
+                            size="sm"
+                            startDecorator={<FileUploadRoundedIcon sx={{ fontSize: 18 }} />}
+                            onClick={() => setImportModalOpen(true)}
+                            sx={{ fontWeight: 600, borderRadius: '8px', px: 2 }}
+                        >
+                            Import
+                        </Button>
                         <Button
                             variant="outlined"
                             size="sm"
@@ -211,13 +234,40 @@ export function TestsPage() {
                         />
                     </Card>
 
-                    {lastResult && (
-                        <Sheet variant="outlined" sx={{ borderRadius: '12px', p: 3 }}>
-                            <Typography level="title-md" fontWeight={700} mb={2}>Last Run Result</Typography>
-                            <RunResults result={lastResult} testName={lastTestName} />
-                        </Sheet>
-                    )}
                 </Box>
+            )}
+
+            {/* Test Run Result Modal */}
+            <Modal open={resultModalOpen} onClose={() => setResultModalOpen(false)} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ModalDialog layout="center" sx={{ width: { xs: '95vw', sm: 680 }, maxHeight: '85vh', display: 'flex', flexDirection: 'column', borderRadius: 'xl', p: 0, overflow: 'hidden' }}>
+                    <ModalClose sx={{ top: 14, right: 14 }} />
+                    <Box sx={{ p: 3, pb: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+                        <Typography level="title-lg" fontWeight={700}>{lastTestName}</Typography>
+                        <Typography level="body-sm" textColor="neutral.500">Test Run Result</Typography>
+                    </Box>
+                    <Box sx={{ flex: 1, overflowY: 'auto', p: 3 }}>
+                        {lastResult && <RunResults result={lastResult} testName={lastTestName} />}
+                    </Box>
+                    <Divider />
+                    <Box sx={{ p: 2, display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+                        <Button variant="outlined" color="neutral" onClick={() => setResultModalOpen(false)}>Close</Button>
+                        {lastTestId && (
+                            <Button variant="soft" color="primary" onClick={() => { setResultModalOpen(false); navigate(`/p/${pid}/tests/${lastTestId}`); }}>
+                                View Test Detail
+                            </Button>
+                        )}
+                    </Box>
+                </ModalDialog>
+            </Modal>
+
+            {pid && (
+                <ImportModal
+                    open={importModalOpen}
+                    onClose={() => setImportModalOpen(false)}
+                    projectId={pid}
+                    categories={categories}
+                    onImported={() => loadData(pid)}
+                />
             )}
 
             <Modal open={categoryModalOpen} onClose={() => setCategoryModalOpen(false)}>
@@ -225,7 +275,7 @@ export function TestsPage() {
                     <ModalClose />
                     <Typography level="h4" fontWeight={600} mb={2}>Create Category</Typography>
                     <form onSubmit={handleCreateCategory}>
-                        <FormControl sx={{ mb: 3 }}>
+                        <FormControl sx={{ mb: 2 }}>
                             <FormLabel>Category Name</FormLabel>
                             <Input
                                 value={newCatName}
@@ -235,8 +285,21 @@ export function TestsPage() {
                                 autoFocus
                             />
                         </FormControl>
+                        <FormControl sx={{ mb: 3 }}>
+                            <FormLabel>Parent Category (optional)</FormLabel>
+                            <Select
+                                placeholder="None (top-level)"
+                                value={newCatParentId}
+                                onChange={(_, v) => setNewCatParentId(v as number | null)}
+                            >
+                                <Option value={null}>None (top-level)</Option>
+                                {categories.map(c => (
+                                    <Option key={c.id} value={c.id}>{c.name}</Option>
+                                ))}
+                            </Select>
+                        </FormControl>
                         <Box display="flex" justifyContent="flex-end" gap={1.5}>
-                            <Button variant="plain" color="neutral" onClick={() => setCategoryModalOpen(false)}>Cancel</Button>
+                            <Button variant="plain" color="neutral" onClick={() => { setCategoryModalOpen(false); setNewCatParentId(null); }}>Cancel</Button>
                             <Button type="submit" color="primary">Create</Button>
                         </Box>
                     </form>

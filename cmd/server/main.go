@@ -86,6 +86,10 @@ func main() {
 			protected.PUT("/env-vars/:id", h.UpdateEnvVar)
 			protected.DELETE("/env-vars/:id", h.DeleteEnvVar)
 
+			// Import
+			protected.POST("/import/postman", h.ImportPostman)
+			protected.POST("/import/openapi", h.ImportOpenAPI)
+
 			protected.GET("/tests", h.ListTestRequests)
 			protected.POST("/tests", h.CreateTestRequest)
 			protected.GET("/tests/:id", h.GetTestRequest)

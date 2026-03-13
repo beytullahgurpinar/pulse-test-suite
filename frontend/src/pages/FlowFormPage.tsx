@@ -12,8 +12,8 @@ import {
     CardContent,
     CircularProgress,
     Sheet,
-    Select,
-    Option,
+    Autocomplete,
+    Chip,
     Divider,
 } from '@mui/joy';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
@@ -24,7 +24,7 @@ import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRound
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import { api } from '../api';
-import type { Flow, FlowStep, TestRequest } from '../types';
+import type { Flow, FlowStep, TestRequest, Category } from '../types';
 import { PageHeader } from '../components/PageHeader';
 
 export function FlowFormPage() {
@@ -38,11 +38,14 @@ export function FlowFormPage() {
     const [name, setName] = useState('');
     const [steps, setSteps] = useState<(FlowStep & { uid: string })[]>([]);
     const [projectTests, setProjectTests] = useState<TestRequest[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]);
     const [error, setError] = useState('');
 
     useEffect(() => {
         if (!pid) return;
-        api.listTests(pid).then(setProjectTests).catch(console.error);
+        Promise.all([api.listTests(pid), api.listCategories(pid)])
+            .then(([tests, cats]) => { setProjectTests(tests); setCategories(cats); })
+            .catch(console.error);
 
         if (flowId) {
             api.getFlow(flowId).then((f) => {
@@ -251,15 +254,48 @@ export function FlowFormPage() {
                                                 <Box display="flex" gap={2} mb={2}>
                                                     <FormControl sx={{ flex: 1 }}>
                                                         <FormLabel>Test to Execute</FormLabel>
-                                                        <Select
-                                                            placeholder="Select a test"
-                                                            value={step.testRequestId || null}
-                                                            onChange={(_, val) => updateStep(idx, 'testRequestId', val)}
-                                                        >
-                                                            {projectTests.map((t) => (
-                                                                <Option key={t.id} value={t.id}>{t.name}</Option>
-                                                            ))}
-                                                        </Select>
+                                                        <Autocomplete
+                                                            placeholder="Search and select a test..."
+                                                            options={[...projectTests].sort((a, b) => {
+                                                                const ca = categories.find(c => c.id === a.categoryId)?.name ?? '';
+                                                                const cb = categories.find(c => c.id === b.categoryId)?.name ?? '';
+                                                                return ca.localeCompare(cb) || a.name.localeCompare(b.name);
+                                                            })}
+                                                            getOptionLabel={(t) => t.name}
+                                                            isOptionEqualToValue={(opt, val) => opt.id === val.id}
+                                                            value={projectTests.find(t => t.id === step.testRequestId) ?? null}
+                                                            onChange={(_, val) => updateStep(idx, 'testRequestId', val?.id ?? 0)}
+                                                            startDecorator={(() => {
+                                                                const sel = projectTests.find(t => t.id === step.testRequestId);
+                                                                if (!sel) return undefined;
+                                                                return (
+                                                                    <Chip size="sm" variant="soft"
+                                                                        color={({ GET: 'success', POST: 'primary', PUT: 'warning', DELETE: 'danger', PATCH: 'neutral' }[sel.method] as any) || 'neutral'}
+                                                                        sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.65rem' }}>
+                                                                        {sel.method}
+                                                                    </Chip>
+                                                                );
+                                                            })()}
+                                                            slotProps={{ listbox: { sx: { maxHeight: 280, '--List-padding': '4px' } } }}
+                                                            renderOption={(props, t) => {
+                                                                const catName = categories.find(c => c.id === t.categoryId)?.name;
+                                                                return (
+                                                                    <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}>
+                                                                        <Chip size="sm" variant="soft"
+                                                                            color={({ GET: 'success', POST: 'primary', PUT: 'warning', DELETE: 'danger', PATCH: 'neutral' }[t.method] as any) || 'neutral'}
+                                                                            sx={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.6rem', minWidth: 44, flexShrink: 0 }}>
+                                                                            {t.method}
+                                                                        </Chip>
+                                                                        <Box sx={{ minWidth: 0 }}>
+                                                                            <Typography level="body-sm" fontWeight={600} noWrap>{t.name}</Typography>
+                                                                            {catName && (
+                                                                                <Typography level="body-xs" textColor="neutral.400" noWrap>{catName}</Typography>
+                                                                            )}
+                                                                        </Box>
+                                                                    </Box>
+                                                                );
+                                                            }}
+                                                        />
                                                     </FormControl>
                                                     <IconButton
                                                         color="danger"
