@@ -114,6 +114,7 @@ type TestRequest struct {
 	URL        string      `json:"url" gorm:"type:text;not null"`
 	Headers    JSONMap     `json:"headers" gorm:"type:json"`
 	Body       string      `json:"body" gorm:"type:text"`
+	RetryCount int         `json:"retryCount" gorm:"default:0"` // 0 = no retry
 	Assertions []Assertion `json:"assertions" gorm:"foreignKey:TestRequestID;constraint:OnDelete:CASCADE"`
 	CreatedAt  time.Time   `json:"createdAt"`
 	UpdatedAt  time.Time   `json:"updatedAt"`

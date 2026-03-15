@@ -26,7 +26,7 @@ export interface EnvVar {
 export interface Assertion {
   id?: number;
   testRequestId?: number;
-  type: 'status' | 'json_path';
+  type: 'status' | 'json_path' | 'response_time' | 'header' | 'json_schema';
   key: string;
   operator: string;
   expectedValue: string;
@@ -50,6 +50,7 @@ export interface TestRequest {
   url: string;
   headers: Record<string, string>;
   body: string;
+  retryCount?: number;
   assertions: Assertion[];
 }
 

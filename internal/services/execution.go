@@ -99,7 +99,18 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 		return nil, err
 	}
 	envMap, securedNames := s.LoadEnvMap(envID)
-	result := runner.ExecuteTest(test, envMap)
+
+	maxAttempts := 1
+	if test.RetryCount > 0 {
+		maxAttempts = test.RetryCount + 1
+	}
+	var result *runner.RunResult
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		result = runner.ExecuteTest(test, envMap)
+		if result.Passed {
+			break
+		}
+	}
 
 	maskedURL, maskedHeaders, maskedBody := MaskSecuredInRequest(
 		result.RequestURL, result.RequestHeaders, result.RequestBody,

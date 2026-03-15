@@ -8,12 +8,13 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/models"
-
 	"github.com/tidwall/gjson"
+	"github.com/xeipuuv/gojsonschema"
 )
 
 // isPrivateIP checks if an IP is in a private/reserved range (SSRF protection)
@@ -70,6 +71,7 @@ type AssertionResult struct {
 type RunResult struct {
 	StatusCode       int
 	ResponseBody     string
+	ResponseHeaders  map[string]string
 	DurationMs       int64
 	Passed           bool
 	AssertionResults []AssertionResult
@@ -119,10 +121,19 @@ func ExecuteTest(req *models.TestRequest, envVars map[string]string) *RunResult 
 	result.ResponseBody = string(bodyBytes)
 	result.StatusCode = resp.StatusCode
 
+	// Capture response headers
+	respHeaders := make(map[string]string)
+	for k, v := range resp.Header {
+		if len(v) > 0 {
+			respHeaders[k] = v[0]
+		}
+	}
+	result.ResponseHeaders = respHeaders
+
 	// Run assertions
 	allPassed := true
 	for _, a := range req.Assertions {
-		ar := runAssertion(&a, result.StatusCode, result.ResponseBody)
+		ar := runAssertion(&a, result.StatusCode, result.ResponseBody, respHeaders, result.DurationMs, envVars)
 		result.AssertionResults = append(result.AssertionResults, ar)
 		if !ar.Passed {
 			allPassed = false
@@ -187,22 +198,26 @@ func buildRequest(req *models.TestRequest, envVars map[string]string) (*http.Req
 	return httpReq, snapshot, nil
 }
 
-func runAssertion(a *models.Assertion, statusCode int, responseBody string) AssertionResult {
+func runAssertion(a *models.Assertion, statusCode int, responseBody string, responseHeaders map[string]string, durationMs int64, envVars map[string]string) AssertionResult {
+	// Resolve {{VAR}} placeholders in expectedValue (env vars + flow extractions)
+	expectedValue := ProcessWithEnv(a.ExpectedValue, envVars)
+
 	ar := AssertionResult{
 		AssertionID: a.ID,
 		Type:        a.Type,
 		Key:         a.Key,
-		Expected:    a.ExpectedValue,
+		Expected:    expectedValue,
 	}
 
 	switch a.Type {
 	case "status":
 		actual := fmt.Sprintf("%d", statusCode)
 		ar.Actual = actual
-		ar.Passed = actual == a.ExpectedValue
+		ar.Passed = actual == expectedValue
 		if !ar.Passed {
-			ar.Message = fmt.Sprintf("Expected status %s, got %s", a.ExpectedValue, actual)
+			ar.Message = fmt.Sprintf("Expected status %s, got %s", expectedValue, actual)
 		}
+
 	case "json_path":
 		value := gjson.Get(responseBody, a.Key)
 		actual := value.String()
@@ -210,11 +225,11 @@ func runAssertion(a *models.Assertion, statusCode int, responseBody string) Asse
 
 		switch a.Operator {
 		case "eq", "equals":
-			ar.Passed = compareEquals(actual, a.ExpectedValue, value)
+			ar.Passed = compareEquals(actual, expectedValue, value)
 		case "ne", "not_equals":
-			ar.Passed = !compareEquals(actual, a.ExpectedValue, value)
+			ar.Passed = !compareEquals(actual, expectedValue, value)
 		case "contains":
-			ar.Passed = strings.Contains(actual, a.ExpectedValue)
+			ar.Passed = strings.Contains(actual, expectedValue)
 		case "exists":
 			ar.Passed = value.Exists()
 		case "not_exists":
@@ -240,12 +255,98 @@ func runAssertion(a *models.Assertion, statusCode int, responseBody string) Asse
 				ar.Message = fmt.Sprintf("Path %s: expected false, got %s", a.Key, formatActual(value))
 			}
 		default:
-			ar.Passed = compareEquals(actual, a.ExpectedValue, value)
+			ar.Passed = compareEquals(actual, expectedValue, value)
 		}
 
 		if !ar.Passed && ar.Message == "" {
-			ar.Message = fmt.Sprintf("Path %s: expected %s, got %s", a.Key, a.ExpectedValue, actual)
+			ar.Message = fmt.Sprintf("Path %s: expected %s, got %s", a.Key, expectedValue, actual)
 		}
+
+	case "response_time":
+		ar.Actual = fmt.Sprintf("%dms", durationMs)
+		expectedMs, err := strconv.ParseInt(strings.TrimSpace(expectedValue), 10, 64)
+		if err != nil {
+			ar.Passed = false
+			ar.Message = fmt.Sprintf("Invalid duration value: %s", expectedValue)
+			break
+		}
+		switch a.Operator {
+		case "lt", "":
+			ar.Passed = durationMs < expectedMs
+		case "lte":
+			ar.Passed = durationMs <= expectedMs
+		case "gt":
+			ar.Passed = durationMs > expectedMs
+		case "gte":
+			ar.Passed = durationMs >= expectedMs
+		default:
+			ar.Passed = durationMs < expectedMs
+		}
+		if !ar.Passed {
+			ar.Message = fmt.Sprintf("Response time %dms did not satisfy %s %dms", durationMs, a.Operator, expectedMs)
+		}
+
+	case "header":
+		// Case-insensitive header lookup
+		actual := ""
+		keyLower := strings.ToLower(a.Key)
+		for k, v := range responseHeaders {
+			if strings.ToLower(k) == keyLower {
+				actual = v
+				break
+			}
+		}
+		ar.Actual = actual
+		switch a.Operator {
+		case "eq", "equals", "":
+			ar.Passed = actual == expectedValue
+			if !ar.Passed {
+				ar.Message = fmt.Sprintf("Header %s: expected %q, got %q", a.Key, expectedValue, actual)
+			}
+		case "ne", "not_equals":
+			ar.Passed = actual != expectedValue
+			if !ar.Passed {
+				ar.Message = fmt.Sprintf("Header %s: expected not %q", a.Key, expectedValue)
+			}
+		case "contains":
+			ar.Passed = strings.Contains(actual, expectedValue)
+			if !ar.Passed {
+				ar.Message = fmt.Sprintf("Header %s: %q does not contain %q", a.Key, actual, expectedValue)
+			}
+		case "exists":
+			ar.Passed = actual != ""
+			if !ar.Passed {
+				ar.Message = fmt.Sprintf("Header %s not present in response", a.Key)
+			}
+		case "not_exists":
+			ar.Passed = actual == ""
+			if !ar.Passed {
+				ar.Message = fmt.Sprintf("Header %s should not be present", a.Key)
+			}
+		}
+
+	case "json_schema":
+		schemaLoader := gojsonschema.NewStringLoader(expectedValue)
+		docLoader := gojsonschema.NewStringLoader(responseBody)
+		result, err := gojsonschema.Validate(schemaLoader, docLoader)
+		if err != nil {
+			ar.Passed = false
+			ar.Message = "Schema validation error: " + err.Error()
+			break
+		}
+		ar.Passed = result.Valid()
+		if !ar.Passed {
+			errs := result.Errors()
+			msgs := make([]string, 0, len(errs))
+			for _, e := range errs {
+				msgs = append(msgs, e.String())
+			}
+			ar.Message = strings.Join(msgs, "; ")
+			ar.Actual = fmt.Sprintf("%d violation(s)", len(errs))
+		} else {
+			ar.Actual = "valid"
+		}
+
 	default:
 		ar.Passed = false
 		ar.Message = "Unknown assertion type"

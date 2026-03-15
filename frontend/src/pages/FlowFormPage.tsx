@@ -34,6 +34,17 @@ export function FlowFormPage() {
     const flowId = id ? parseInt(id, 10) : null;
 
     const [loading, setLoading] = useState(!!flowId);
+
+    const getCategoryPath = (catId: number | null | undefined, cats: Category[]): string => {
+        if (!catId) return '';
+        const cat = cats.find(c => c.id === catId);
+        if (!cat) return '';
+        if (cat.parentId) {
+            const parent = getCategoryPath(cat.parentId, cats);
+            return parent ? `${parent} / ${cat.name}` : cat.name;
+        }
+        return cat.name;
+    };
     const [saving, setSaving] = useState(false);
     const [name, setName] = useState('');
     const [steps, setSteps] = useState<(FlowStep & { uid: string })[]>([]);
@@ -257,8 +268,8 @@ export function FlowFormPage() {
                                                         <Autocomplete
                                                             placeholder="Search and select a test..."
                                                             options={[...projectTests].sort((a, b) => {
-                                                                const ca = categories.find(c => c.id === a.categoryId)?.name ?? '';
-                                                                const cb = categories.find(c => c.id === b.categoryId)?.name ?? '';
+                                                                const ca = getCategoryPath(a.categoryId, categories);
+                                                                const cb = getCategoryPath(b.categoryId, categories);
                                                                 return ca.localeCompare(cb) || a.name.localeCompare(b.name);
                                                             })}
                                                             getOptionLabel={(t) => t.name}
@@ -278,7 +289,7 @@ export function FlowFormPage() {
                                                             })()}
                                                             slotProps={{ listbox: { sx: { maxHeight: 280, '--List-padding': '4px' } } }}
                                                             renderOption={(props, t) => {
-                                                                const catName = categories.find(c => c.id === t.categoryId)?.name;
+                                                                const catPath = getCategoryPath(t.categoryId, categories);
                                                                 return (
                                                                     <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1, px: 1.5 }}>
                                                                         <Chip size="sm" variant="soft"
@@ -288,8 +299,8 @@ export function FlowFormPage() {
                                                                         </Chip>
                                                                         <Box sx={{ minWidth: 0 }}>
                                                                             <Typography level="body-sm" fontWeight={600} noWrap>{t.name}</Typography>
-                                                                            {catName && (
-                                                                                <Typography level="body-xs" textColor="neutral.400" noWrap>{catName}</Typography>
+                                                                            {catPath && (
+                                                                                <Typography level="body-xs" textColor="neutral.400" noWrap>{catPath}</Typography>
                                                                             )}
                                                                         </Box>
                                                                     </Box>

@@ -59,6 +59,9 @@ function buildUrlWithParams(baseUrl: string, params: { key: string; value: strin
 const ASSERTION_TYPES = [
   { value: 'status', label: 'HTTP Status' },
   { value: 'json_path', label: 'JSON Path' },
+  { value: 'response_time', label: 'Response Time' },
+  { value: 'header', label: 'Response Header' },
+  { value: 'json_schema', label: 'JSON Schema' },
 ];
 
 const OPERATOR_OPTIONS: { value: string; label: string; needsValue: boolean }[] = [
@@ -71,6 +74,21 @@ const OPERATOR_OPTIONS: { value: string; label: string; needsValue: boolean }[] 
   { value: 'is_not_null', label: 'Is Not Null', needsValue: false },
   { value: 'is_true', label: 'Is True', needsValue: false },
   { value: 'is_false', label: 'Is False', needsValue: false },
+];
+
+const RESPONSE_TIME_OPERATORS = [
+  { value: 'lt', label: '< less than' },
+  { value: 'lte', label: '≤ less or equal' },
+  { value: 'gt', label: '> greater than' },
+  { value: 'gte', label: '≥ greater or equal' },
+];
+
+const HEADER_OPERATORS = [
+  { value: 'eq', label: 'Equals' },
+  { value: 'ne', label: 'Not Equals' },
+  { value: 'contains', label: 'Contains' },
+  { value: 'exists', label: 'Exists' },
+  { value: 'not_exists', label: 'Not Exists' },
 ];
 
 const OPERATORS_NEED_VALUE = new Set(OPERATOR_OPTIONS.filter((o) => o.needsValue).map((o) => o.value));
@@ -310,6 +328,18 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                 required
               />
             </FormControl>
+            <FormControl sx={{ minWidth: 120 }}>
+              <FormLabel>Retry on Fail</FormLabel>
+              <Select
+                value={String(form.retryCount ?? 0)}
+                onChange={(_, v) => update('retryCount', Number(v))}
+              >
+                <Option value="0">No retry</Option>
+                <Option value="1">1×</Option>
+                <Option value="2">2×</Option>
+                <Option value="3">3×</Option>
+              </Select>
+            </FormControl>
           </Box>
 
           {/* Query Params Table */}
@@ -416,7 +446,7 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                   </Select>
                 </FormControl>
 
-                {a.type === 'status' ? (
+                {a.type === 'status' && (
                   <FormControl size="sm" sx={{ minWidth: 160 }}>
                     <FormLabel>Expected Status</FormLabel>
                     <Select
@@ -434,14 +464,16 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                       <Option value="500">500 Server Error</Option>
                     </Select>
                   </FormControl>
-                ) : (
+                )}
+
+                {a.type === 'json_path' && (
                   <>
                     <FormControl size="sm" sx={{ minWidth: 200, flex: 1 }}>
                       <FormLabel>JSON Path</FormLabel>
                       <Input
                         value={a.key}
                         onChange={(e) => updateAssertion(i, 'key', e.target.value)}
-                        placeholder="$.data.success"
+                        placeholder="data.success"
                       />
                     </FormControl>
                     <FormControl size="sm" sx={{ minWidth: 160 }}>
@@ -451,9 +483,7 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                         onChange={(_, v) => updateAssertion(i, 'operator', (v as string) || 'eq')}
                       >
                         {OPERATOR_OPTIONS.map((o) => (
-                          <Option key={o.value} value={o.value}>
-                            {o.label}
-                          </Option>
+                          <Option key={o.value} value={o.value}>{o.label}</Option>
                         ))}
                       </Select>
                     </FormControl>
@@ -464,13 +494,14 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                           <Input
                             value={a.expectedValue}
                             onChange={(e) => updateAssertion(i, 'expectedValue', e.target.value)}
-                            placeholder="Enter value"
+                            placeholder="value or {{VAR_NAME}}"
                           />
+                          <Typography level="body-xs" textColor="neutral.400">
+                            Use <Typography component="span" fontFamily="monospace" fontSize="0.7rem" textColor="primary.500">{`{{VAR_NAME}}`}</Typography> for env vars / flow extractions.
+                          </Typography>
                           <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
                             {QUICK_VALUES.map((qv) => (
-                              <Button
-                                key={qv.value}
-                                size="sm"
+                              <Button key={qv.value} size="sm"
                                 variant={a.expectedValue === qv.value ? 'soft' : 'plain'}
                                 color={a.expectedValue === qv.value ? 'primary' : 'neutral'}
                                 onClick={() => updateAssertion(i, 'expectedValue', qv.value)}
@@ -484,6 +515,88 @@ export function TestForm({ testId, projectId, projects, onSave, onCancel }: Prop
                       </FormControl>
                     )}
                   </>
+                )}
+
+                {a.type === 'response_time' && (
+                  <>
+                    <FormControl size="sm" sx={{ minWidth: 160 }}>
+                      <FormLabel>Condition</FormLabel>
+                      <Select
+                        value={a.operator || 'lt'}
+                        onChange={(_, v) => updateAssertion(i, 'operator', (v as string) || 'lt')}
+                      >
+                        {RESPONSE_TIME_OPERATORS.map((o) => (
+                          <Option key={o.value} value={o.value}>{o.label}</Option>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    <FormControl size="sm" sx={{ minWidth: 140 }}>
+                      <FormLabel>Milliseconds</FormLabel>
+                      <Input
+                        type="number"
+                        value={a.expectedValue || ''}
+                        onChange={(e) => updateAssertion(i, 'expectedValue', e.target.value)}
+                        placeholder="500"
+                        endDecorator={<Typography level="body-xs" textColor="neutral.400">ms</Typography>}
+                      />
+                    </FormControl>
+                  </>
+                )}
+
+                {a.type === 'header' && (
+                  <>
+                    <FormControl size="sm" sx={{ minWidth: 180 }}>
+                      <FormLabel>Header Name</FormLabel>
+                      <Input
+                        value={a.key}
+                        onChange={(e) => updateAssertion(i, 'key', e.target.value)}
+                        placeholder="Content-Type"
+                      />
+                    </FormControl>
+                    <FormControl size="sm" sx={{ minWidth: 150 }}>
+                      <FormLabel>Condition</FormLabel>
+                      <Select
+                        value={a.operator || 'eq'}
+                        onChange={(_, v) => updateAssertion(i, 'operator', (v as string) || 'eq')}
+                      >
+                        {HEADER_OPERATORS.map((o) => (
+                          <Option key={o.value} value={o.value}>{o.label}</Option>
+                        ))}
+                      </Select>
+                    </FormControl>
+                    {!['exists', 'not_exists'].includes(a.operator) && (
+                      <FormControl size="sm" sx={{ minWidth: 180, flex: 1 }}>
+                        <FormLabel>Expected Value</FormLabel>
+                        <Input
+                          value={a.expectedValue}
+                          onChange={(e) => updateAssertion(i, 'expectedValue', e.target.value)}
+                          placeholder="application/json"
+                        />
+                      </FormControl>
+                    )}
+                  </>
+                )}
+
+                {a.type === 'json_schema' && (
+                  <FormControl size="sm" sx={{ flex: 1, minWidth: 280 }}>
+                    <FormLabel>JSON Schema</FormLabel>
+                    <textarea
+                      value={a.expectedValue}
+                      onChange={(e) => updateAssertion(i, 'expectedValue', e.target.value)}
+                      placeholder={'{\n  "type": "object",\n  "required": ["id", "name"],\n  "properties": {\n    "id": { "type": "number" },\n    "name": { "type": "string" }\n  }\n}'}
+                      rows={6}
+                      style={{
+                        width: '100%', fontFamily: 'monospace', fontSize: '0.8rem',
+                        padding: '8px', borderRadius: '6px', resize: 'vertical',
+                        border: '1px solid var(--joy-palette-neutral-300)',
+                        background: 'var(--joy-palette-background-surface)',
+                        color: 'var(--joy-palette-text-primary)',
+                      }}
+                    />
+                    <Typography level="body-xs" textColor="neutral.400" sx={{ mt: 0.5 }}>
+                      JSON Schema Draft 7. Validates the entire response body.
+                    </Typography>
+                  </FormControl>
                 )}
 
                 <Box sx={{ display: 'flex', gap: 0.5, ml: 'auto' }}>

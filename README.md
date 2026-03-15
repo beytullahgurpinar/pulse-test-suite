@@ -37,35 +37,64 @@
 
 ### 🧪 1. Intelligent Test Creation
 Define your API requests with precision. **Pulse** supports:
-- **Dynamic Payloads**: Use JSON for body and headers with full support for environment variables `{{variable}}`.
-- **Mock Data Injection**: Automatically generate random values (UUIDs, names, emails, credit cards, dates) at runtime using built-in placeholders (e.g. `{{$guid}}`, `{{$timestamp}}`).
+- **Dynamic Payloads**: Use JSON for body, headers and query params with full support for environment variables `{{variable}}`.
+- **Mock Data Injection**: Automatically generate random values (UUIDs, names, emails, credit cards, dates) at runtime using built-in placeholders (e.g. `{{guid}}`, `{{timestamp}}`).
 - **Multi-Method Support**: Full CRUD (GET, POST, PUT, DELETE, PATCH, etc.) support.
-- **Advanced Assertions**: Validate your API results with a variety of built-in operators (`eq`, `ne`, `contains`, `exists`, JSONPath `$.data.id`).
+- **Query Param Builder**: Add, edit and remove query string parameters from a structured table — no manual URL editing needed.
+- **Retry on Failure**: Configure per-test retry count (1×, 2×, 3×). Pulse re-executes failed tests automatically before marking them as failed — ideal for flaky networks or rate-limited endpoints.
 
-### ⛓️ 2. Advanced Workflow Orchestration (Flows)
+### ✅ 2. Advanced Assertion Engine
+Validate every dimension of your API responses:
+
+| Type | What it checks | Example |
+|---|---|---|
+| **HTTP Status** | Response status code | `200 OK`, `404 Not Found` |
+| **JSON Path** | Any field in the response body | `data.token` equals `{{TOKEN}}` |
+| **Response Time** | End-to-end latency | `< 500ms` |
+| **Response Header** | Any response header | `Content-Type` contains `application/json` |
+| **JSON Schema** | Full response structure validation | Draft 7 schema |
+
+**Dynamic values in assertions:** Use `{{VAR_NAME}}` in any expected value field to reference environment variables or values extracted from earlier flow steps.
+
+```
+// Assert that the transaction ID matches the one extracted from step 1
+data.transactionId  equals  {{TRANSACTION_ID}}
+```
+
+Supported JSON Path operators: `eq`, `ne`, `contains`, `exists`, `not_exists`, `is_null`, `is_not_null`, `is_true`, `is_false`.
+
+### ⛓️ 3. Advanced Workflow Orchestration (Flows)
 Don't just test endpoints; test **Business Scenarios**. Our "Flow" engine allows you to:
 - **Chain Requests**: Execute multiple API calls in a strict sequence.
-- **Data Extraction & Pipelining**: Capture values from one response (e.g., an `access_token` or `transaction_id` via JSONPath) and inject them into subsequent steps.
-- **Conditional Execution**: Stop the flow immediately if any step fails to meet expectations.
-- **Drag & Drop Ordering**: Easily reorder your steps to build complex test cases playfully.
+- **Data Extraction & Pipelining**: Capture values from one response (e.g., an `access_token` or `transaction_id` via JSONPath) and automatically inject them into subsequent steps — URLs, headers, body, and even assertions.
+- **Conditional Execution**: Stop the flow immediately if any step fails.
+- **Step Ordering**: Reorder steps with up/down controls.
+- **Nested Category Browsing**: The test picker shows full category paths (`Auth / OAuth / Social`) so you can quickly find the right test in large projects.
 
-### ⏱️ 3. Industrial-Grade Scheduling
+### ⏱️ 4. Industrial-Grade Scheduling
 Turn your tests into a pro-active monitoring system.
 - **Periodic Runs**: Schedule individual tests, all project tests, or entire multi-step flows to run at regular intervals (every 5 mins, hourly, daily, etc.).
 - **Environment Targeting**: Run your schedules explicitly against `Staging`, `Production`, or any custom environment.
 
-### 🔒 4. The Security Vault (Environment Management)
+### 🔒 5. The Security Vault (Environment Management)
 Security is not an afterthought in **Pulse**.
 - **AES-256 Encryption**: All sensitive keys, tokens, and secrets are encrypted at rest in the database.
 - **UI Masking**: Secured variables are never shown in plain text; they appear as `secret:***` in history logs, UI panels, and reports.
-- **Environments**: Keep your `Development`, `Staging`, and `Production` variables strictly separated and quickly switch between them.
+- **Named Environments**: Keep your `Development`, `Staging`, and `Production` variables strictly separated — duplicate, rename, set default, or delete environments with a single click.
 
-### 🔔 5. Instant Notifications & Webhooks
+### 📂 6. Test Organization
+Keep large test suites manageable:
+- **Nested Categories**: Organize tests into hierarchical folder trees (unlimited depth). Import automatically creates categories from Postman folder structures or OpenAPI tags.
+- **Collapsible Tree View**: Expand/collapse category folders in the test list. Collapsed folders show the total test count inside.
+- **Instant Search**: Search across all tests by name, method, or URL — switches to a flat result view automatically.
+- **Import from Postman & OpenAPI**: Paste a Postman Collection v2.x JSON or OpenAPI 3.x / Swagger 2.x YAML/JSON. Pulse previews what will be imported, then creates tests, categories, and folder hierarchies in one click. Re-importing is safe — existing tests are never duplicated.
+
+### 🔔 7. Instant Notifications & Webhooks
 Stay ahead of the game with real-time feedback.
 - **Success & Failure Alerts**: Get notified via Slack, Teams, or any custom Webhook when a scheduled job completes.
 - **Comprehensive Payloads**: Every notification includes a summary of tests passed, failed, and context.
 
-### 📊 6. Premium Dashboard & Analytics
+### 📊 8. Premium Dashboard & Analytics
 High-fidelity data visualization for technical leads.
 - **Success Rates**: Monitor the health of all projects at a glance.
 - **Performance Trends**: Track average response times and duration trends.
