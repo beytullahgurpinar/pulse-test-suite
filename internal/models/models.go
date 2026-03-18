@@ -145,7 +145,7 @@ type TestRun struct {
 	// Request snapshot - actual values sent (after env/placeholder substitution)
 	RequestMethod  string `json:"requestMethod" gorm:"size:10"`
 	RequestURL     string `json:"requestUrl" gorm:"type:text"`
-	RequestHeaders string `json:"requestHeaders" gorm:"type:json"`
+	RequestHeaders string `json:"requestHeaders" gorm:"type:text"`
 	RequestBody    string `json:"requestBody" gorm:"type:longtext"`
 	// Multi-tenancy
 	WorkspaceID uint `json:"workspaceId" gorm:"not null;index"`

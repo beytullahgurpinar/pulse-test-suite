@@ -66,6 +66,33 @@ func Decrypt(ciphertextB64 string, key []byte) (string, error) {
 	return string(plaintext), nil
 }
 
+// EncryptField encrypts val with AES-256-GCM and prepends "enc:" prefix.
+// Returns val unchanged if val is empty or encryption fails.
+func EncryptField(val string, key []byte) string {
+	if val == "" {
+		return val
+	}
+	encrypted, err := Encrypt(val, key)
+	if err != nil {
+		return val
+	}
+	return "enc:" + encrypted
+}
+
+// DecryptField decrypts a field encrypted by EncryptField.
+// If the value does not start with "enc:", it is returned as-is (plaintext legacy data).
+func DecryptField(val string, key []byte) string {
+	const prefix = "enc:"
+	if len(val) <= len(prefix) || val[:len(prefix)] != prefix {
+		return val
+	}
+	decrypted, err := Decrypt(val[len(prefix):], key)
+	if err != nil {
+		return val
+	}
+	return decrypted
+}
+
 // MaskSecuredValue returns a masked display string for secured values
 // e.g. "secret:abc****" (first 3 chars visible) or "secret:****" if shorter
 func MaskSecuredValue(value string) string {

@@ -37,6 +37,13 @@ func (h *Handler) getWorkspaceID(c *gin.Context) uint {
 	return 0
 }
 
+// decryptTestRun decrypts encrypted fields on a TestRun in-place.
+func (h *Handler) decryptTestRun(tr *models.TestRun) {
+	tr.ResponseBody = crypto.DecryptField(tr.ResponseBody, h.EncryptionKey)
+	tr.RequestBody = crypto.DecryptField(tr.RequestBody, h.EncryptionKey)
+	tr.RequestHeaders = crypto.DecryptField(tr.RequestHeaders, h.EncryptionKey)
+}
+
 func (h *Handler) hasProject(c *gin.Context, projectID uint) bool {
 	wsID := h.getWorkspaceID(c)
 	var count int64
@@ -522,6 +529,7 @@ func (h *Handler) RunTest(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	h.decryptTestRun(testRun)
 
 	var ar []runner.AssertionResult
 	if testRun.AssertionResults != "" {
@@ -587,6 +595,7 @@ func (h *Handler) RunAllTests(c *gin.Context) {
 	results := []gin.H{}
 	for _, req := range list {
 		testRun, _ := h.execution.ExecuteAndSaveTest(&req, nil, envID)
+		h.decryptTestRun(testRun)
 
 		var ar []runner.AssertionResult
 		if testRun.AssertionResults != "" {
@@ -676,6 +685,7 @@ func (h *Handler) ListTestRuns(c *gin.Context) {
 	}
 	enriched := make([]RunWithName, len(runs))
 	for i, r := range runs {
+		h.decryptTestRun(&r)
 		enriched[i] = RunWithName{TestRun: r, TestName: nameMap[r.TestRequestID]}
 	}
 
@@ -699,7 +709,7 @@ func (h *Handler) GetTestRun(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
 	}
-	// Rest of the logic to return run details...
+	h.decryptTestRun(&tr)
 	var ar []runner.AssertionResult
 	if tr.AssertionResults != "" {
 		_ = json.Unmarshal([]byte(tr.AssertionResults), &ar)

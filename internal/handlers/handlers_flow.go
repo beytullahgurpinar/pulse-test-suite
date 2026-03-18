@@ -170,6 +170,9 @@ func (h *Handler) RunFlow(c *gin.Context) {
 	}
 
 	h.DB.Preload("Steps.TestRun").First(run, run.ID)
+	for i := range run.Steps {
+		h.decryptTestRun(&run.Steps[i].TestRun)
+	}
 	c.JSON(http.StatusOK, run)
 }
 
@@ -230,6 +233,9 @@ func (h *Handler) GetFlowRun(c *gin.Context) {
 	if run.WorkspaceID != wsID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "Access denied"})
 		return
+	}
+	for i := range run.Steps {
+		h.decryptTestRun(&run.Steps[i].TestRun)
 	}
 	c.JSON(http.StatusOK, run)
 }

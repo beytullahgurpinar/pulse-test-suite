@@ -45,6 +45,11 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	}
 	log.Println("Database migration completed.")
 
+	// request_headers was previously json type; must be text to store encrypted values.
+	if db.Migrator().HasColumn(&models.TestRun{}, "request_headers") {
+		_ = db.Exec("ALTER TABLE test_runs MODIFY COLUMN request_headers TEXT").Error
+	}
+
 	// Ensure default workspace exists
 	var ws models.Workspace
 	if err := db.First(&ws).Error; err != nil {

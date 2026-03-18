@@ -116,6 +116,12 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 		result.RequestURL, result.RequestHeaders, result.RequestBody,
 		envMap, securedNames,
 	)
+	maskedURL = crypto.MaskPCI(maskedURL)
+	maskedBody = crypto.MaskPCI(maskedBody)
+	for k, v := range maskedHeaders {
+		maskedHeaders[k] = crypto.MaskPCI(v)
+	}
+	maskedResponseBody := crypto.MaskPCI(result.ResponseBody)
 
 	arJSON, _ := json.Marshal(result.AssertionResults)
 	headersJSON, _ := json.Marshal(maskedHeaders)
@@ -131,14 +137,14 @@ func (s *ExecutionService) ExecuteAndSaveTest(test *models.TestRequest, schedule
 		TestRequestID:    test.ID,
 		Status:           status,
 		StatusCode:       result.StatusCode,
-		ResponseBody:     result.ResponseBody,
+		ResponseBody:     crypto.EncryptField(maskedResponseBody, s.EncryptionKey),
 		DurationMs:       result.DurationMs,
 		ErrorMessage:     result.Error,
 		AssertionResults: string(arJSON),
 		RequestMethod:    result.RequestMethod,
 		RequestURL:       maskedURL,
-		RequestHeaders:   string(headersJSON),
-		RequestBody:      maskedBody,
+		RequestHeaders:   crypto.EncryptField(string(headersJSON), s.EncryptionKey),
+		RequestBody:      crypto.EncryptField(maskedBody, s.EncryptionKey),
 		ScheduleID:       scheduleID,
 		WorkspaceID:      p.WorkspaceID,
 	}
@@ -190,6 +196,12 @@ func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint, env
 			result.RequestURL, result.RequestHeaders, result.RequestBody,
 			envMap, securedNames,
 		)
+		maskedURL = crypto.MaskPCI(maskedURL)
+		maskedBody = crypto.MaskPCI(maskedBody)
+		for k, v := range maskedHeaders {
+			maskedHeaders[k] = crypto.MaskPCI(v)
+		}
+		maskedResponseBody := crypto.MaskPCI(result.ResponseBody)
 
 		status := "passed"
 		if !result.Passed {
@@ -204,14 +216,14 @@ func (s *ExecutionService) ExecuteAndSaveFlow(flowID uint, scheduleID *uint, env
 			TestRequestID:    req.ID,
 			Status:           status,
 			StatusCode:       result.StatusCode,
-			ResponseBody:     result.ResponseBody,
+			ResponseBody:     crypto.EncryptField(maskedResponseBody, s.EncryptionKey),
 			DurationMs:       result.DurationMs,
 			ErrorMessage:     result.Error,
 			AssertionResults: string(arJSON),
 			RequestMethod:    result.RequestMethod,
 			RequestURL:       maskedURL,
-			RequestHeaders:   string(headersJSON),
-			RequestBody:      maskedBody,
+			RequestHeaders:   crypto.EncryptField(string(headersJSON), s.EncryptionKey),
+			RequestBody:      crypto.EncryptField(maskedBody, s.EncryptionKey),
 			ScheduleID:       scheduleID,
 			WorkspaceID:      flow.Project.WorkspaceID,
 		}
