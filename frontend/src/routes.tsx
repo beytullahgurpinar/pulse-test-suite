@@ -18,6 +18,8 @@ import { AuthSuccessPage } from './pages/AuthSuccessPage';
 import { InvitePage } from './pages/InvitePage';
 import { UsersPage } from './pages/UsersPage';
 import { ResultsPage } from './pages/ResultsPage';
+import { McpKeysPage } from './pages/McpKeysPage';
+import { DocsPage } from './pages/DocsPage';
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = localStorage.getItem('token');
@@ -55,10 +57,12 @@ export const router = createBrowserRouter([
       { path: 'p/:projectId/results', element: <ResultsPage /> },
       { path: 'p/:projectId/schedules', element: <SchedulesPage /> },
       { path: 'p/:projectId/env', element: <EnvPage /> },
+      { path: 'p/:projectId/mcp-keys', element: <McpKeysPage /> },
       { path: 'p/:projectId', element: <Navigate to="tests" replace /> },
 
       { path: 'projects', element: <ProjectsPage /> },
       { path: 'users', element: <UsersPage /> },
+      { path: 'docs', element: <DocsPage /> },
       { path: 'p/:projectId/tests/new', element: <TestFormPage /> },
       { path: 'p/:projectId/flows/new', element: <FlowFormPage /> },
       { path: 'p/:projectId/flows/:id/edit', element: <FlowFormPage /> },

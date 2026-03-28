@@ -1,7 +1,7 @@
 # Frontend build + web klasörüne kopyala + Go build
-.PHONY: build frontend go
+.PHONY: build frontend go mcp run
 
-build: frontend go
+build: frontend go mcp
 
 frontend:
 	cd frontend && npm run build
@@ -10,6 +10,9 @@ frontend:
 
 go:
 	go build -o server ./cmd/server
+
+mcp:
+	go build -o zotlo-mcp ./cmd/mcp
 
 run: build
 	./server

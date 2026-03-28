@@ -190,6 +190,22 @@ export interface FlowRun {
   createdAt: string;
 }
 
+// MCP Keys
+export interface McpKey {
+  id: number;
+  projectId: number;
+  environmentId?: number | null;
+  name: string;
+  keyPrefix: string;  // e.g. "zts_a1b2c3d4" — shown in list
+  lastUsedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface McpKeyCreated extends McpKey {
+  key: string; // full key, shown only once
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;

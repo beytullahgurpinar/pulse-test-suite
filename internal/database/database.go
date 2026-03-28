@@ -40,6 +40,7 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 		&models.FlowRun{},
 		&models.FlowRunStep{},
 		&models.Invitation{},
+		&models.MCPKey{},
 	); err != nil {
 		return nil, err
 	}

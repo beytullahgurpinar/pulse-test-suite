@@ -10,6 +10,7 @@ import (
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/config"
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/database"
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/handlers"
+	"github.com/beytullahgurpinar/pulse-test-suite/internal/mcphttp"
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/scheduler"
 	"github.com/beytullahgurpinar/pulse-test-suite/internal/static"
 
@@ -135,6 +136,12 @@ func main() {
 				invGroup.DELETE("/:id", users.DeleteInvitation)
 			}
 
+			// MCP Keys
+			protected.GET("/mcp-keys", h.ListMcpKeys)
+			protected.POST("/mcp-keys", h.CreateMcpKey)
+			protected.POST("/mcp-keys/:id/rotate", h.RotateMcpKey)
+			protected.DELETE("/mcp-keys/:id", h.DeleteMcpKey)
+
 			// Dashboard
 			protected.GET("/dashboard", h.GetDashboard)
 
@@ -146,6 +153,10 @@ func main() {
 			protected.POST("/schedules/:id/toggle", h.ToggleSchedule)
 		}
 	}
+
+	// MCP HTTP endpoint — key via ?key=zts_... or X-MCP-Key header
+	mcpHandler := mcphttp.New(db, cfg.EncryptionKey)
+	r.Any("/mcp", mcpHandler.Auth, mcpHandler.Serve)
 
 	// Static frontend - serve directly with c.Data (no redirects)
 	webFS, _ := fs.Sub(static.WebFS, "web")

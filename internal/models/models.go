@@ -174,6 +174,19 @@ type Schedule struct {
 	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
+// MCPKey - Project-scoped MCP API keys
+type MCPKey struct {
+	ID            uint       `json:"id" gorm:"primaryKey"`
+	ProjectID     uint       `json:"projectId" gorm:"not null;index"`
+	EnvironmentID *uint      `json:"environmentId" gorm:"default:null"`
+	Name          string     `json:"name" gorm:"size:255;not null"`
+	KeyPrefix     string     `json:"keyPrefix" gorm:"size:16;not null"`     // e.g. "zts_a1b2c3d4"
+	KeyHash       string     `json:"-" gorm:"size:64;not null;uniqueIndex"` // SHA-256 of full key
+	LastUsedAt    *time.Time `json:"lastUsedAt"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
 // Flow - Test akışı senaryolaması
 type Flow struct {
 	ID        uint       `json:"id" gorm:"primaryKey"`

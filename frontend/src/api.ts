@@ -1,6 +1,6 @@
 import type {
   TestRequest, RunResult, TestRun, Project, EnvVar, Environment, DashboardData,
-  Schedule, Category, Flow, FlowRun, PaginatedResponse
+  Schedule, Category, Flow, FlowRun, PaginatedResponse, McpKey, McpKeyCreated
 } from './types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '/api';
@@ -140,6 +140,16 @@ export const api = {
     fetchApi<PaginatedResponse<FlowRun>>(`/flows/runs?page=${page}&limit=${limit}${flowId ? `&flowId=${flowId}` : ''}`),
   getFlowRun: (id: number) =>
     fetchApi<FlowRun>(`/flows/runs/${id}`),
+
+  // MCP Keys
+  listMcpKeys: (projectId: number) =>
+    fetchApi<McpKey[]>(`/mcp-keys?projectId=${projectId}`),
+  createMcpKey: (data: { projectId: number; environmentId?: number | null; name: string }) =>
+    fetchApi<McpKeyCreated>('/mcp-keys', { method: 'POST', body: JSON.stringify(data) }),
+  rotateMcpKey: (id: number) =>
+    fetchApi<McpKeyCreated>(`/mcp-keys/${id}/rotate`, { method: 'POST' }),
+  deleteMcpKey: (id: number) =>
+    fetchApi<{ message: string }>(`/mcp-keys/${id}`, { method: 'DELETE' }),
 
   // Auth
   getMe: () => fetchApi<{ id: number; email: string; name: string; avatar: string; role: string; lastProjectId?: number | null; workspace: any }>('/auth/me'),

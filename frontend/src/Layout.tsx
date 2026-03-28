@@ -24,6 +24,8 @@ import FolderRoundedIcon from '@mui/icons-material/FolderRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
+import TokenRoundedIcon from '@mui/icons-material/TokenRounded';
+import MenuBookRoundedIcon from '@mui/icons-material/MenuBookRounded';
 import type { Project } from './types';
 import { api } from './api';
 import { ColorSchemeToggle } from './components/ColorSchemeToggle';
@@ -98,6 +100,8 @@ export function Layout() {
     { label: 'Results', icon: <AssessmentRoundedIcon />, path: '/p/:id/results', global: false, adminOnly: false },
     { label: 'Schedules', icon: <ScheduleRoundedIcon />, path: '/p/:id/schedules', global: false, adminOnly: false },
     { label: 'Environment', icon: <VpnKeyRoundedIcon />, path: '/p/:id/env', global: false, adminOnly: false },
+    { label: 'MCP Keys', icon: <TokenRoundedIcon />, path: '/p/:id/mcp-keys', global: false, adminOnly: false },
+    { label: 'Docs', icon: <MenuBookRoundedIcon />, path: '/docs', global: true, adminOnly: false },
     { label: 'Manage Projects', icon: <SettingsRoundedIcon />, path: '/projects', global: true, adminOnly: true },
     { label: 'Users', icon: <GroupRoundedIcon />, path: '/users', global: true, adminOnly: true },
   ].filter(item => !item.adminOnly || isAdmin);

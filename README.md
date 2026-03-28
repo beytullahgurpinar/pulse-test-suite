@@ -1,20 +1,20 @@
 <div align="center">
-  <img src="screens/1.png" alt="Pulse Test Suite Logo" width="100%" style="border-radius: 12px; margin-bottom: 20px;" />
-  <h1>🚀 Pulse Test Suite</h1>
-  <p><b>The Professional-Grade API Monitoring & Workflow Orchestration Platform.</b></p>
+  <img src="screens/1.png" alt="Pulse Test Suite" width="100%" style="border-radius: 12px; margin-bottom: 20px;" />
+  <h1>Pulse Test Suite</h1>
+  <p><b>Professional API Testing, Monitoring & AI-Native Workflow Platform.</b></p>
   <p>
     <a href="#-key-features">Features</a> •
+    <a href="#-mcp--ai-integration">MCP / AI</a> •
     <a href="#-getting-started">Getting Started</a> •
-    <a href="#-tech-stack">Tech Stack</a> •
-    <a href="#-community--support">Community</a>
+    <a href="#-tech-stack">Tech Stack</a>
   </p>
 </div>
 
-**Pulse Test Suite** is a powerful, developer-centric platform designed for teams that need to go beyond simple manual API calls. It combines automated testing, multi-step workflow orchestration, and 24/7 monitoring into a sleek, premium experience. Whether you're debugging a single endpoint or monitoring a complex microservices architecture, Pulse has you covered.
+**Pulse Test Suite** is a self-hostable API testing and monitoring platform for teams that need automated assertions, multi-step flow orchestration, scheduled monitoring, and first-class AI integration via the Model Context Protocol (MCP).
 
 ---
 
-## ✨ Overview
+## Overview
 
 <div align="center">
   <img src="screens/2.png" alt="Dashboard" width="48%" style="border-radius: 8px; margin-right: 2%;" />
@@ -33,131 +33,206 @@
 
 ---
 
-## 🔥 Key Features
+## Key Features
 
-### 🧪 1. Intelligent Test Creation
-Define your API requests with precision. **Pulse** supports:
-- **Dynamic Payloads**: Use JSON for body, headers and query params with full support for environment variables `{{variable}}`.
-- **Mock Data Injection**: Automatically generate random values (UUIDs, names, emails, credit cards, dates) at runtime using built-in placeholders (e.g. `{{guid}}`, `{{timestamp}}`).
-- **Multi-Method Support**: Full CRUD (GET, POST, PUT, DELETE, PATCH, etc.) support.
-- **Query Param Builder**: Add, edit and remove query string parameters from a structured table — no manual URL editing needed.
-- **Retry on Failure**: Configure per-test retry count (1×, 2×, 3×). Pulse re-executes failed tests automatically before marking them as failed — ideal for flaky networks or rate-limited endpoints.
+### 1. Intelligent Test Creation
+Define API requests with precision:
+- **Environment Variables**: Use `{{variable}}` in URLs, headers, body, and assertions. Variables are scoped per environment (Development, Staging, Production).
+- **Mock Data Injection**: Built-in placeholders auto-generate random values at runtime — `{{guid}}`, `{{email}}`, `{{timestamp}}`, `{{name}}`, `{{phone}}`, etc.
+- **Full HTTP Method Support**: GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS.
+- **Retry on Failure**: Configure per-test retry count (1×, 2×, 3×). Failed tests are automatically re-run before being marked failed — useful for flaky networks or rate-limited endpoints.
 
-### ✅ 2. Advanced Assertion Engine
+### 2. Advanced Assertion Engine
 Validate every dimension of your API responses:
 
 | Type | What it checks | Example |
 |---|---|---|
-| **HTTP Status** | Response status code | `200 OK`, `404 Not Found` |
+| **HTTP Status** | Response status code | `200`, `404` |
 | **JSON Path** | Any field in the response body | `data.token` equals `{{TOKEN}}` |
 | **Response Time** | End-to-end latency | `< 500ms` |
 | **Response Header** | Any response header | `Content-Type` contains `application/json` |
 | **JSON Schema** | Full response structure validation | Draft 7 schema |
 
-**Dynamic values in assertions:** Use `{{VAR_NAME}}` in any expected value field to reference environment variables or values extracted from earlier flow steps.
-
-```
-// Assert that the transaction ID matches the one extracted from step 1
-data.transactionId  equals  {{TRANSACTION_ID}}
-```
-
 Supported JSON Path operators: `eq`, `ne`, `contains`, `exists`, `not_exists`, `is_null`, `is_not_null`, `is_true`, `is_false`.
 
-### ⛓️ 3. Advanced Workflow Orchestration (Flows)
-Don't just test endpoints; test **Business Scenarios**. Our "Flow" engine allows you to:
-- **Chain Requests**: Execute multiple API calls in a strict sequence.
-- **Data Extraction & Pipelining**: Capture values from one response (e.g., an `access_token` or `transaction_id` via JSONPath) and automatically inject them into subsequent steps — URLs, headers, body, and even assertions.
-- **Conditional Execution**: Stop the flow immediately if any step fails.
+Use `{{VAR_NAME}}` in any expected value to reference environment variables or values extracted from earlier flow steps.
+
+### 3. Workflow Orchestration (Flows)
+Test complete business scenarios, not just individual endpoints:
+- **Chained Requests**: Execute API calls in a strict sequence.
+- **Data Extraction & Pipelining**: Capture values from one response (e.g., `access_token`, `transaction_id`) via JSONPath and inject them into subsequent steps — URLs, headers, body, and assertions.
+- **Fail Fast**: Flow stops immediately if any step fails.
 - **Step Ordering**: Reorder steps with up/down controls.
-- **Nested Category Browsing**: The test picker shows full category paths (`Auth / OAuth / Social`) so you can quickly find the right test in large projects.
+- **Nested Category Browsing**: The test picker shows full category paths (`Auth / OAuth / Social`) for easy navigation in large projects.
 
-### ⏱️ 4. Industrial-Grade Scheduling
-Turn your tests into a pro-active monitoring system.
-- **Periodic Runs**: Schedule individual tests, all project tests, or entire multi-step flows to run at regular intervals (every 5 mins, hourly, daily, etc.).
-- **Environment Targeting**: Run your schedules explicitly against `Staging`, `Production`, or any custom environment.
+### 4. Scheduled Monitoring
+Turn your tests into a proactive monitoring system:
+- **Periodic Runs**: Schedule individual tests, all project tests, or entire flows to run at configurable intervals (5 min, hourly, daily, etc.).
+- **Environment Targeting**: Run schedules explicitly against Staging, Production, or any custom environment.
+- **Webhook Notifications**: Get notified via Slack, Teams, or any webhook when a job passes or fails. Configurable per schedule.
 
-### 🔒 5. The Security Vault (Environment Management)
-Security is not an afterthought in **Pulse**.
-- **AES-256 Encryption**: All sensitive keys, tokens, and secrets are encrypted at rest in the database.
-- **UI Masking**: Secured variables are never shown in plain text; they appear as `secret:***` in history logs, UI panels, and reports.
-- **Named Environments**: Keep your `Development`, `Staging`, and `Production` variables strictly separated — duplicate, rename, set default, or delete environments with a single click.
+### 5. Security & Encryption
+- **AES-256-GCM Encryption**: All sensitive values (secured env vars, request/response snapshots) are encrypted at rest in the database.
+- **PCI Data Masking**: Card numbers, CVVs, and other PCI-sensitive patterns are automatically detected and masked in request/response logs — they never reach the database in plain text.
+- **Secured Variables**: Secrets stored as env vars are displayed as `secret:***` in all UI panels, logs, and reports. The raw value is never transmitted to the frontend.
+- **SSRF Protection**: Requests to private IP ranges (`127.x`, `10.x`, `192.168.x`, `169.254.x`, cloud metadata endpoints) are blocked at the runner level.
 
-### 📂 6. Test Organization
-Keep large test suites manageable:
-- **Nested Categories**: Organize tests into hierarchical folder trees (unlimited depth). Import automatically creates categories from Postman folder structures or OpenAPI tags.
-- **Collapsible Tree View**: Expand/collapse category folders in the test list. Collapsed folders show the total test count inside.
-- **Instant Search**: Search across all tests by name, method, or URL — switches to a flat result view automatically.
-- **Import from Postman & OpenAPI**: Paste a Postman Collection v2.x JSON or OpenAPI 3.x / Swagger 2.x YAML/JSON. Pulse previews what will be imported, then creates tests, categories, and folder hierarchies in one click. Re-importing is safe — existing tests are never duplicated.
+### 6. Test Organization
+- **Nested Categories**: Hierarchical folder trees with unlimited depth.
+- **Collapsible Tree View**: Expand/collapse folders; collapsed folders show the test count inside.
+- **Instant Search**: Search by name, method, or URL — switches to a flat result view automatically.
+- **Import from Postman & OpenAPI**: Paste a Postman Collection v2.x JSON or OpenAPI 3.x / Swagger 2.x YAML/JSON. Pulse previews what will be imported, then creates tests, categories, and folder structures in one click. Re-importing is safe — existing tests are updated, not duplicated.
 
-### 🔔 7. Instant Notifications & Webhooks
-Stay ahead of the game with real-time feedback.
-- **Success & Failure Alerts**: Get notified via Slack, Teams, or any custom Webhook when a scheduled job completes.
-- **Comprehensive Payloads**: Every notification includes a summary of tests passed, failed, and context.
+### 7. Multi-Tenancy & User Management
+- **Workspaces**: Full tenant isolation — each workspace has its own projects, tests, environments, and run history.
+- **Google OAuth**: Sign in with Google. The first user to log in claims the Admin role for the workspace.
+- **Roles**: `admin` (full access, user management) and `editor` (create/run/edit tests).
+- **Invitation System**: Admins invite team members by email. Invite links are single-use and role-scoped.
 
-### 📊 8. Premium Dashboard & Analytics
-High-fidelity data visualization for technical leads.
-- **Success Rates**: Monitor the health of all projects at a glance.
-- **Performance Trends**: Track average response times and duration trends.
-- **Live History**: A detailed, searchable log of every manual and scheduled run with full request/response snapshots.
+### 8. Dashboard & Analytics
+- **Success Rates**: Monitor health across all projects at a glance.
+- **Performance Trends**: Track average response times.
+- **Live History**: Searchable log of every manual and scheduled run with full request/response snapshots.
 
 ---
 
-## 🚀 Getting Started
+## MCP / AI Integration
 
-**Pulse** is designed to be self-hostable, lightweight, and incredibly easy to launch. We use Docker to make the deployment entirely frictionless.
+Pulse includes a native **Model Context Protocol (MCP)** server that lets Claude (or any MCP-compatible AI tool) run your tests and flows directly from the editor — no browser needed.
 
-### 🐳 Quick Start with Docker
+### How it works
+
+1. Create a project-scoped **MCP Key** in the web UI under **Project → MCP Keys**.
+   Each key is optionally bound to a specific environment.
+2. Start the MCP server with that key:
+   ```bash
+   MCP_KEY=zts_yourkey ./zotlo-mcp
+   ```
+3. The server authenticates the key, resolves the project and environment automatically, and exposes the tools below to Claude.
+
+### Available MCP Tools
+
+| Tool | Description |
+|---|---|
+| `list_tests` | List all tests in the project |
+| `run_test` | Run a specific test by ID, returns result immediately |
+| `run_all_tests` | Run every test in the project, returns pass/fail summary |
+| `list_flows` | List all flows in the project |
+| `run_flow` | Run a flow step-by-step, returns per-step results |
+
+### MCP Key Security
+- Keys are in the format `zts_<40 hex chars>`.
+- Only the SHA-256 hash is stored in the database — the full key is shown **once** at creation time.
+- Keys can be **rotated** at any time (old key is immediately invalidated) or **deleted**.
+- Each key records its `lastUsedAt` timestamp.
+
+### Register with Claude Code
+```bash
+claude mcp add zotlo-test-suite /path/to/zotlo-mcp
+```
+
+Or edit `~/.claude.json` to add an env var:
+```json
+{
+  "mcpServers": {
+    "zotlo-test-suite": {
+      "command": "/path/to/zotlo-mcp",
+      "env": { "MCP_KEY": "zts_yourkey" }
+    }
+  }
+}
+```
+
+### Build the MCP binary
+```bash
+go build -o zotlo-mcp ./cmd/mcp
+```
+
+Rebuild whenever you update the server.
+
+---
+
+## Getting Started
+
+Pulse is self-hostable and ships as a single Docker Compose stack.
+
+### Quick Start with Docker
 
 ```bash
-# Clone the repository
 git clone https://github.com/beytullahgurpinar/pulse-test-suite.git
 cd pulse-test-suite
 
-# Configure your environment (optional but recommended for production)
-# cp .env.example .env
+# Optional: configure environment
+cp .env.example .env
 
-# Launch the entire stack (Frontend, Backend, and Database)
+# Start the full stack (backend + frontend + MySQL)
 docker-compose up -d --build
 ```
-Your monitoring suite is now live at **[http://localhost:8181](http://localhost:8181)**.
 
-*(Default credentials for first setup are managed via your very first registration which claims the Admin Space).*
+App is now live at **http://localhost:8181**.
 
----
+The first user to sign in with Google claims the Admin role for the workspace.
 
-## 🛠️ Tech Stack
+### Run locally (development)
 
-**Pulse** is built on a modern stack designed for raw performance, reliability, and enterprise aesthetics:
+**Backend:**
+```bash
+cp .env.example .env   # set your DB credentials and keys
+go run ./cmd/server
+```
 
-- **Backend Architecture**: Go (Golang) — High-concurrency, memory-safe, and blazing fast execution.
-- **Frontend Layer**: React 18 + TypeScript + Vite — Type-safe, blazingly fast HMR, and responsive.
-- **Design System**: MUI Joy UI — Premium, modern, heavily customized aesthetic out of the box.
-- **Data Persistence**: MySQL 8.0 — Structured, relational, and highly reliable data storage via GORM.
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
----
-
-## 🤝 Community & Contributions
-
-**Pulse** is a source-available initiative built to solve real engineering bottlenecks. We strongly welcome pull requests!
-
-Looking to contribute?
-- Add new **assertion operators** (e.g., regex matching).
-- Expand **mock data generation** types.
-- Enhance performance optimizations or add external integrations (Jira, PagerDuty).
-
-Just fork the repo, create your feature branch, and submit a PR.
+Frontend runs on `http://localhost:5173`, proxying API calls to `:8181`.
 
 ---
 
-## ⚖️ License
+## Environment Variables
 
-This project is licensed under the **MIT License + Commons Clause 1.0**.
-
-**Pulse** is completely free for individuals, students, and open-source development. You can host it internally for your company without restrictions. However, the **Commons Clause** prevents the sale of this software or providing it as a commercial hosted service (SaaS) where the primary value derived is the software itself.
-
-*See the [LICENSE](LICENSE) file for the full text.*
+| Variable | Default | Description |
+|---|---|---|
+| `MYSQL_HOST` | `localhost` | MySQL host |
+| `MYSQL_PORT` | `3306` | MySQL port |
+| `MYSQL_USER` | `root` | MySQL user |
+| `MYSQL_PASSWORD` | `password` | MySQL password |
+| `MYSQL_DATABASE` | `pulse_db` | Database name |
+| `PORT` | `8181` | HTTP server port |
+| `ENCRYPTION_KEY` | *(dev fallback)* | AES key for encrypting secrets — **change in production** |
+| `JWT_SECRET` | *(same as ENCRYPTION_KEY)* | Secret for signing JWT tokens |
+| `GOOGLE_CLIENT_ID` | — | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | — | Google OAuth client secret |
+| `APP_URL` | `http://localhost:8181` | Public base URL (used for OAuth callback) |
 
 ---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Go — Gin, GORM |
+| Frontend | React 18 + TypeScript + Vite |
+| Design System | MUI Joy UI |
+| Database | MySQL 8.0 |
+| AI Integration | Model Context Protocol (MCP) — `mark3labs/mcp-go` |
+| Auth | Google OAuth 2.0 + JWT |
+
+---
+
+## License
+
+Licensed under the **MIT License + Commons Clause 1.0**.
+
+Free for individuals, students, and internal company use. The Commons Clause prohibits selling this software or offering it as a hosted SaaS product where the software itself is the primary value.
+
+See [LICENSE](LICENSE) for the full text.
+
+---
+
 <div align="center">
-  <i>Developed with ❤️ by <b>Beytullah Gürpınar</b></i>
+  <i>Developed by <b>Beytullah Gürpınar</b></i>
 </div>
