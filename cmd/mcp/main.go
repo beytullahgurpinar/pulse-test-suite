@@ -118,6 +118,34 @@ func main() {
 		handleRunFlow,
 	)
 
+	s.AddTool(
+		mcp.NewTool("create_test",
+			mcp.WithDescription("Create a new API test in the project. Optionally include assertions. Returns the created test ID."),
+			mcp.WithString("name",
+				mcp.Description("Name of the test"),
+				mcp.Required(),
+			),
+			mcp.WithString("method",
+				mcp.Description("HTTP method: GET, POST, PUT, PATCH, DELETE"),
+				mcp.Required(),
+			),
+			mcp.WithString("url",
+				mcp.Description("Full URL to test, e.g. https://api.example.com/users"),
+				mcp.Required(),
+			),
+			mcp.WithString("headers",
+				mcp.Description(`Optional JSON object of request headers, e.g. {"Authorization":"Bearer token","Content-Type":"application/json"}`),
+			),
+			mcp.WithString("body",
+				mcp.Description("Optional request body (JSON string or plain text)"),
+			),
+			mcp.WithString("assertions",
+				mcp.Description(`Optional JSON array of assertions. Each item: {"type":"status","operator":"eq","expectedValue":"200"} or {"type":"json_path","key":"data.id","operator":"exists"} — operators: eq, ne, contains, exists`),
+			),
+		),
+		handleCreateTest,
+	)
+
 	if err := server.ServeStdio(s); err != nil {
 		log.Fatal(err)
 	}
@@ -306,6 +334,86 @@ func handleRunFlow(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolRes
 		}
 	}
 
+	return mcp.NewToolResultText(sb.String()), nil
+}
+
+func handleCreateTest(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	args := req.GetArguments()
+
+	name, _ := args["name"].(string)
+	method, _ := args["method"].(string)
+	url, _ := args["url"].(string)
+
+	if name == "" || method == "" || url == "" {
+		return mcp.NewToolResultError("name, method, and url are required"), nil
+	}
+
+	test := models.TestRequest{
+		ProjectID: projectID,
+		Name:      name,
+		Method:    strings.ToUpper(method),
+		URL:       url,
+	}
+
+	// Parse optional headers
+	if headersStr, _ := args["headers"].(string); headersStr != "" {
+		var h models.JSONMap
+		if err := json.Unmarshal([]byte(headersStr), &h); err != nil {
+			return mcp.NewToolResultError("invalid headers JSON: " + err.Error()), nil
+		}
+		test.Headers = h
+	}
+
+	// Optional body
+	if body, _ := args["body"].(string); body != "" {
+		test.Body = body
+	}
+
+	// Parse optional assertions
+	var assertions []models.Assertion
+	if assertionsStr, _ := args["assertions"].(string); assertionsStr != "" {
+		type assertionInput struct {
+			Type          string `json:"type"`
+			Key           string `json:"key"`
+			Operator      string `json:"operator"`
+			ExpectedValue string `json:"expectedValue"`
+		}
+		var inputs []assertionInput
+		if err := json.Unmarshal([]byte(assertionsStr), &inputs); err != nil {
+			return mcp.NewToolResultError("invalid assertions JSON: " + err.Error()), nil
+		}
+		for _, a := range inputs {
+			assertions = append(assertions, models.Assertion{
+				Type:          a.Type,
+				Key:           a.Key,
+				Operator:      a.Operator,
+				ExpectedValue: a.ExpectedValue,
+			})
+		}
+	}
+
+	// Save test + assertions in a transaction
+	if err := db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&test).Error; err != nil {
+			return err
+		}
+		for i := range assertions {
+			assertions[i].TestRequestID = test.ID
+		}
+		if len(assertions) > 0 {
+			return tx.Create(&assertions).Error
+		}
+		return nil
+	}); err != nil {
+		return mcp.NewToolResultError("failed to create test: " + err.Error()), nil
+	}
+
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "Test created successfully!\nID: %d\nName: %s\nMethod: %s\nURL: %s\n", test.ID, test.Name, test.Method, test.URL)
+	if len(assertions) > 0 {
+		fmt.Fprintf(&sb, "Assertions: %d added\n", len(assertions))
+	}
+	fmt.Fprintf(&sb, "\nRun it with: run_test {\"test_id\": \"%d\"}", test.ID)
 	return mcp.NewToolResultText(sb.String()), nil
 }
 

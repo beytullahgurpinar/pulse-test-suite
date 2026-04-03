@@ -45,6 +45,7 @@ const TOC_ITEMS: TocItem[] = [
       { id: 'mcp-stdio', label: 'Stdio (local)' },
       { id: 'mcp-http', label: 'HTTP (remote)' },
       { id: 'mcp-tools', label: 'Available Tools' },
+      { id: 'mcp-create', label: 'Creating Tests' },
     ],
   },
   { id: 'user-management', label: 'User Management' },
@@ -1118,6 +1119,7 @@ Variable name:  TOKEN
                   ['run_all_tests', 'Run every test in the project sequentially. Returns a pass/fail summary with counts and per-test status.'],
                   ['list_flows', 'List all flows in the project. Returns flow IDs, names, and step counts.'],
                   ['run_flow', 'Run a flow by ID step-by-step. Returns the result for each step including extracted variable values, making it easy for the AI to reason about the data.'],
+                  ['create_test', 'Create a new API test in the project with optional headers, body, and assertions. Returns the new test ID so it can be run immediately.'],
                 ].map(([name, desc]) => (
                   <tr key={name}>
                     <td><InlineCode>{name}</InlineCode></td>
@@ -1127,6 +1129,109 @@ Variable name:  TOKEN
               </tbody>
             </Table>
           </Sheet>
+
+          <SubSectionTitle id="mcp-create">Creating Tests via MCP</SubSectionTitle>
+          <Typography level="body-md" sx={{ mb: 2, lineHeight: 1.8 }}>
+            The <InlineCode>create_test</InlineCode> tool lets Claude (or any MCP client) define a
+            new API test directly — including request headers, body, and assertions — without
+            touching the web UI. After creation the tool returns the test ID so it can be run
+            immediately with <InlineCode>run_test</InlineCode>.
+          </Typography>
+          <Typography level="body-md" sx={{ mb: 1.5, fontWeight: 600 }}>Parameters:</Typography>
+          <Sheet variant="outlined" sx={{ borderRadius: 'md', overflow: 'auto', mb: 3 }}>
+            <Table
+              size="sm"
+              sx={{
+                '& thead th': { fontWeight: 700, bgcolor: 'background.level1' },
+                '& td, & th': { px: 2, py: 1.2, verticalAlign: 'top' },
+                minWidth: 520,
+              }}
+            >
+              <thead>
+                <tr>
+                  <th>Parameter</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['name', 'Yes', 'Human-readable name for the test'],
+                  ['method', 'Yes', 'HTTP method: GET, POST, PUT, PATCH, DELETE'],
+                  ['url', 'Yes', 'Full URL. Supports {{variable}} placeholders'],
+                  ['headers', 'No', 'JSON object of request headers, e.g. {"Authorization":"Bearer {{token}}"}'],
+                  ['body', 'No', 'Request body — plain text or JSON string'],
+                  ['assertions', 'No', 'JSON array of assertion objects (see below)'],
+                ].map(([p, req, desc]) => (
+                  <tr key={p}>
+                    <td><InlineCode>{p}</InlineCode></td>
+                    <td><Chip size="sm" variant="soft" color={req === 'Yes' ? 'danger' : 'neutral'}>{req}</Chip></td>
+                    <td><Typography level="body-sm" sx={{ color: 'text.secondary', lineHeight: 1.7 }}>{desc}</Typography></td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </Sheet>
+
+          <Typography level="body-md" sx={{ mb: 1.5, fontWeight: 600 }}>Assertion format:</Typography>
+          <Sheet variant="outlined" sx={{ borderRadius: 'md', overflow: 'auto', mb: 3 }}>
+            <Table
+              size="sm"
+              sx={{
+                '& thead th': { fontWeight: 700, bgcolor: 'background.level1' },
+                '& td, & th': { px: 2, py: 1.2, verticalAlign: 'top' },
+                minWidth: 560,
+              }}
+            >
+              <thead>
+                <tr>
+                  <th>type</th>
+                  <th>key</th>
+                  <th>operator</th>
+                  <th>expectedValue</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><InlineCode>status</InlineCode></td>
+                  <td><Typography level="body-sm" sx={{ color: 'text.tertiary' }}>—</Typography></td>
+                  <td><InlineCode>eq</InlineCode> / <InlineCode>ne</InlineCode></td>
+                  <td><Typography level="body-sm">"200", "404" …</Typography></td>
+                </tr>
+                <tr>
+                  <td><InlineCode>json_path</InlineCode></td>
+                  <td><Typography level="body-sm">e.g. <InlineCode>data.token</InlineCode></Typography></td>
+                  <td><InlineCode>eq</InlineCode> / <InlineCode>ne</InlineCode> / <InlineCode>contains</InlineCode> / <InlineCode>exists</InlineCode></td>
+                  <td><Typography level="body-sm">any string, or omit for <InlineCode>exists</InlineCode></Typography></td>
+                </tr>
+                <tr>
+                  <td><InlineCode>json_equals</InlineCode></td>
+                  <td><Typography level="body-sm" sx={{ color: 'text.tertiary' }}>—</Typography></td>
+                  <td><Typography level="body-sm" sx={{ color: 'text.tertiary' }}>—</Typography></td>
+                  <td><Typography level="body-sm">exact JSON body string</Typography></td>
+                </tr>
+              </tbody>
+            </Table>
+          </Sheet>
+
+          <Typography level="body-md" sx={{ mb: 1.5, fontWeight: 600 }}>Example:</Typography>
+          <CodeBlock>{`create_test(
+  name: "Login and get token",
+  method: "POST",
+  url: "https://api.example.com/auth/login",
+  headers: '{"Content-Type":"application/json"}',
+  body: '{"email":"user@example.com","password":"{{PASSWORD}}"}',
+  assertions: '[
+    {"type":"status","operator":"eq","expectedValue":"200"},
+    {"type":"json_path","key":"data.token","operator":"exists"},
+    {"type":"json_path","key":"data.user.email","operator":"eq","expectedValue":"user@example.com"}
+  ]'
+)`}</CodeBlock>
+          <Typography level="body-sm" sx={{ color: 'text.secondary', mt: 1.5, mb: 3, lineHeight: 1.7 }}>
+            After the test is created, Claude can immediately call{' '}
+            <InlineCode>run_test</InlineCode> with the returned ID to verify it passes —
+            all within the same conversation.
+          </Typography>
 
           <SectionDivider />
 

@@ -119,6 +119,28 @@ Pulse includes a native **Model Context Protocol (MCP)** server that lets Claude
 | `run_all_tests` | Run every test in the project, returns pass/fail summary |
 | `list_flows` | List all flows in the project |
 | `run_flow` | Run a flow step-by-step, returns per-step results |
+| `create_test` | Create a new test with headers, body, and assertions |
+
+### Creating Tests via MCP
+
+Claude can create new tests dynamically with the `create_test` tool:
+
+```
+create_test:
+  name: "Get User Profile"
+  method: "GET"
+  url: "https://api.example.com/users/1"
+  headers: '{"Authorization": "Bearer {{token}}"}'
+  assertions: '[{"type":"status","operator":"eq","expectedValue":"200"},{"type":"json_path","key":"data.id","operator":"exists"}]'
+```
+
+**Assertion types:**
+
+| `type` | `key` | `operator` | `expectedValue` |
+|---|---|---|---|
+| `status` | — | `eq`, `ne` | `"200"` |
+| `json_path` | `data.token` | `eq`, `ne`, `contains`, `exists` | any value |
+| `json_equals` | — | — | full JSON body |
 
 ### MCP Key Security
 - Keys are in the format `zts_<40 hex chars>`.
